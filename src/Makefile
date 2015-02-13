@@ -21,7 +21,8 @@ SRCC =	bluebottle.c	\
 	precursor.c	\
 	recorder.c	\
 	seeder.c	\
-	vtk.c
+	vtk.c	\
+	Eulerian.c
 
 SRCCUDA = cuda_bluebottle.cu	\
 	cuda_bicgstab.cu	\
@@ -33,7 +34,9 @@ SRCCUDA = cuda_bluebottle.cu	\
 	bicgstab_kernel.cu	\
 	entrySearch_kernel.cu	\
 	particle_kernel.cu	\
-	quadrature_kernel.cu
+	quadrature_kernel.cu	\
+	cuda_Eulerian.cu	\
+	cuda_Eulerian_kernel.cu
 
 EXTRA = Makefile		\
 	bluebottle.h		\
@@ -47,7 +50,9 @@ EXTRA = Makefile		\
 	particle.h		\
 	precursor.h		\
 	recorder.h		\
-	vtk.h
+	vtk.h	\
+	Eulerian.h		\
+	cuda_Eulerian.h
 
 # compile normally
 all: COPT += -O3

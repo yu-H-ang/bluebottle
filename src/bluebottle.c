@@ -24,6 +24,8 @@
 #include "bluebottle.h"
 #include "particle.h"
 #include "precursor.h"
+#include "Eulerian.h"
+#include "math.h"
 
 // define global variables that were declared in header file
 int dev_start;
@@ -160,6 +162,32 @@ real pid_back;
 real Kp;
 real Ki;
 real Kd;
+//######################################################################
+// used by Eulerian branch
+real bubble_radius;
+real bubble_density;
+int bubble_init_cond;
+real bubble_init_cond_uniform_m;
+numdenBC_struct numdenBC;
+real *numden;
+real *u_p;
+real *v_p;
+real *w_p;
+real **_numden;
+real **_nextnumden;
+real **_u_p;
+real **_v_p;
+real **_w_p;
+
+real concen_diff;
+real concen_diss;
+int concen_init_cond;
+real concen_init_cond_uniform_m;
+numdenBC_struct concenBC;
+real *concen;
+real **_concen;
+real **_nextconcen;
+//######################################################################
 
 int main(int argc, char *argv[]) {
 
@@ -271,8 +299,16 @@ int main(int argc, char *argv[]) {
       // read simulation input configuration file
       printf("\nRunning bluebottle_0.1...\n\n");
       printf("Reading the domain and particle input files...\n\n");
+      fflush(stdout);
       domain_read_input();
       parts_read_input(turb);
+      //################################################################
+      // read number density
+      numberdensity_read_input();
+      // real concentration
+      concentration_read_input();
+      //################################################################
+      printf("done.\n");
       fflush(stdout);
       //printf("FLOW: Using devices %d through %d.\n\n", dev_start, dev_end);
       //fflush(stdout);
@@ -331,6 +367,19 @@ int main(int argc, char *argv[]) {
         printf("for the given domain decomposition.  Exiting now.\n");
         return EXIT_FAILURE;
       }
+      
+      //################################################################
+      // initialize the number density field
+      printf("Initializing number density fields...");
+      fflush(stdout);
+      int numberdensity_init_flag = numberdensity_init();
+      printf("done.\n");
+      fflush(stdout);
+      if(numberdensity_init_flag == EXIT_FAILURE) {
+        printf("\nThe initial numberdensity configuration is not allowed.\n");
+        return EXIT_FAILURE;
+      }
+      //################################################################
 
       // set up the boundary condition config info to send to precursor
       expd_init_BC(np);
@@ -357,6 +406,12 @@ int main(int argc, char *argv[]) {
       cuda_part_malloc();
       printf("...done.\n");
       fflush(stdout);
+      //################################################################
+      printf("Allocating numberdensity CUDA device memory...");
+      fflush(stdout);
+      cuda_numberdensity_malloc();
+      printf("...done.\n");
+      //################################################################
 
       // copy host data to devices
       printf("Copying host domain data to devices...");
@@ -369,7 +424,13 @@ int main(int argc, char *argv[]) {
       cuda_part_push();
       printf("done.\n");
       fflush(stdout);
-
+      //################################################################
+      printf("Copying host numberdensity data to devices...");
+      fflush(stdout);
+      cuda_numberdensity_push();
+      printf("...done.\n");
+      //################################################################
+      
       count_mem();
 
       // initialize ParaView VTK output PVD file
@@ -410,7 +471,8 @@ int main(int argc, char *argv[]) {
           restart_stop = 1;
         }
       }
-
+      
+      /*
       #ifdef DEBUG
         // write config to screen
         printf("\n=====DEBUG");
@@ -425,6 +487,7 @@ int main(int argc, char *argv[]) {
         printf("========================================\n\n");
         fflush(stdout);
       #endif
+      */
 
       #ifdef TEST // run test code
         // ** note that some of these work only for DEV RANGE 0 0 **
@@ -473,6 +536,10 @@ int main(int argc, char *argv[]) {
           cuda_part_BC();
         }
         cuda_dom_BC();
+        //##############################################################
+        // apply BC to number density field
+        cuda_numberdensity_BC();
+        //##############################################################
 
         // write initial fields
         if(runrestart != 1) {
@@ -579,6 +646,17 @@ int main(int argc, char *argv[]) {
             // update pressure
             cuda_update_p();
             cuda_dom_BC_p();
+            
+            
+            
+            //##########################################################
+            //add terminal velocity
+            cuda_numberdensity_particle_velz();
+            //march the number density equation
+            cuda_numberdensity_march();
+            // apply BC to number density field
+            cuda_numberdensity_BC();
+            //##########################################################
 
             // update Lamb's coefficients
             cuda_move_parts_sub();
@@ -655,6 +733,9 @@ int main(int argc, char *argv[]) {
               // pull back data and write fields
               cuda_dom_pull();
               cuda_part_pull();
+              //########################################################
+              cuda_numberdensity_pull();
+              //########################################################
               #ifndef BATCHRUN
                 printf("  Writing ParaView output file");
                 printf(" %d (t = %e)...                  \r",
@@ -720,7 +801,11 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
           }
         }
-
+        /******************************************************************/
+        /**The end of main timestepping loop in the experimental domain. **/
+        /******************************************************************/
+        
+        
         if(rec_restart_dt > 0 && ttime >= duration && !restart_stop) {
           printf("  Writing final restart file (t = %e)...", ttime);
           fflush(stdout);
@@ -749,6 +834,12 @@ int main(int argc, char *argv[]) {
       cuda_part_free();
       printf("done.\n");
       fflush(stdout);
+      //################################################################
+      printf("Cleaning up numberdensity data on devices...");
+      fflush(stdout);
+      cuda_numberdensity_free();
+      printf("...done.\n");
+      //################################################################
 
       // clean up host
       printf("Cleaning up particles...");
@@ -761,6 +852,12 @@ int main(int argc, char *argv[]) {
       domain_clean();
       printf("done.\n");
       fflush(stdout);
+      //################################################################
+      printf("Cleaning up numberdensity...");
+      fflush(stdout);
+      numberdensity_clean();
+      printf("done.\n");
+      //################################################################
 
       printf("\n...bluebottle_0.1 done.\n\n");
     }
