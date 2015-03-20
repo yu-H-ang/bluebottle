@@ -24,6 +24,8 @@
 #include "cuda_bluebottle.h"
 #include "cuda_particle.h"
 #include "entrySearch.h"
+#include "Eulerian.h"
+#include "cuda_Eulerian.h"
 
 #include <cuda.h>
 #include <helper_cuda.h>
@@ -3010,6 +3012,11 @@ void cuda_dom_BC_p(void)
         case NEUMANN:
           BC_p_B_N<<<numBlocks_p, dimBlocks_p>>>(_p[dev], _dom[dev]);
           break;
+        //######################################################################
+        case DIRICHLET:
+          BC_p_B_D<<<numBlocks_p, dimBlocks_p>>>(_p[dev], _dom[dev], bc.pBD);
+          break;
+        //######################################################################
       }
 
     }
@@ -3040,6 +3047,11 @@ void cuda_dom_BC_p(void)
         case NEUMANN:
           BC_p_T_N<<<numBlocks_p, dimBlocks_p>>>(_p[dev], _dom[dev]);
           break;
+        //######################################################################
+        case DIRICHLET:
+          BC_p_T_D<<<numBlocks_p, dimBlocks_p>>>(_p[dev], _dom[dev], bc.pTD);
+          break;
+        //######################################################################
       }
     }
   }
@@ -3144,6 +3156,12 @@ real cuda_find_dt(void)
     dts[dev] = (u_max + 2. * nu / dom[dev].dx) / dom[dev].dx;
     dts[dev] += (v_max + 2. * nu / dom[dev].dy) / dom[dev].dy;
     dts[dev] += (w_max + 2. * nu / dom[dev].dz) / dom[dev].dz;
+    //##########################################################################
+    //according to the notes from shigan
+    dts[dev] += u_max * u_max / (2.0 * nu);
+    dts[dev] += v_max * v_max / (2.0 * nu);
+    dts[dev] += w_max * w_max / (2.0 * nu);
+    //##########################################################################
     dts[dev] = CFL / dts[dev];
   }
 
@@ -3308,10 +3326,14 @@ void cuda_compute_forcing(real *pid_int, real *pid_back, real Kp, real Ki,
     dim3 dimBlocks_z(threads_x, threads_y);
     dim3 numBlocks_z(blocks_x, blocks_y);
 
+    //##################################################################
     // reset forcing arrays
+    /*
     forcing_reset_x<<<numBlocks_x, dimBlocks_x>>>(_f_x[dev], _dom[dev]);
     forcing_reset_y<<<numBlocks_y, dimBlocks_y>>>(_f_y[dev], _dom[dev]);
     forcing_reset_z<<<numBlocks_z, dimBlocks_z>>>(_f_z[dev], _dom[dev]);
+    */
+    //##################################################################
 
     // linearly accelerate pressure gradient from zero
     if(gradP.xa == 0) gradP.x = gradP.xm;
@@ -3343,6 +3365,8 @@ void cuda_compute_forcing(real *pid_int, real *pid_back, real Kp, real Ki,
     else g.z = ttime*g.za;
 
     // PID controller  TODO: make this into a kernel function
+    //##################################################################
+    /*
     if(Kp > 0 || Ki > 0 || Kd > 0) {
       cuda_part_pull();
       real acc_z = 0;
@@ -3360,11 +3384,16 @@ void cuda_compute_forcing(real *pid_int, real *pid_back, real Kp, real Ki,
       acc_z /= nparts;
 
       *pid_int = *pid_int + acc_z*dt;
-      gradP.z = gradP.z
-        + (Kp*acc_z + Ki*(*pid_int)/ttime + Kd*(acc_z-*pid_back))*rho_avg;
+      gradP.z = gradP.z + (Kp*acc_z + Ki*(*pid_int)/ttime + Kd*(acc_z-*pid_back))*rho_avg;
       *pid_back = acc_z;
     }
-
+    */
+	/*
+	real volp = 4./3.*PI*bubble_radius*bubble_radius*bubble_radius*totalnumden*(Dom.dx * Dom.dy * Dom.dz);
+	real volfrac = volp / (Dom.xl * Dom.yl * Dom.zl);
+	gradP.z = gradP.z + (bubble_density - rho_f) * volfrac * g.zm;
+	*/
+    //##################################################################
     forcing_add_x_const<<<numBlocks_x, dimBlocks_x>>>(-gradP.x / rho_f,
       _f_x[dev], _dom[dev]);
     forcing_add_y_const<<<numBlocks_y, dimBlocks_y>>>(-gradP.y / rho_f,

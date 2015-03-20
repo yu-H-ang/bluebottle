@@ -24,6 +24,7 @@
 
 #include "bluebottle.h"
 #include "domain.h"
+#include "Eulerian.h"
 
 int nsubdom;
 
@@ -168,6 +169,12 @@ void domain_read_input(void)
     bc.pB = PERIODIC;
   else if(strcmp(buf, "NEUMANN") == 0)
     bc.pB = NEUMANN;
+  //############################################################################
+  else if(strcmp(buf, "DIRICHLET") == 0) {
+    bc.pB = DIRICHLET;
+    fret = fscanf(infile, " %lf", &bc.pBD);
+  }
+  //############################################################################
   else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
@@ -178,6 +185,12 @@ void domain_read_input(void)
     bc.pT = PERIODIC;
   else if(strcmp(buf, "NEUMANN") == 0)
     bc.pT = NEUMANN;
+  //############################################################################
+  else if(strcmp(buf, "DIRICHLET") == 0) {
+    bc.pT = DIRICHLET;
+    fret = fscanf(infile, " %lf", &bc.pTD);
+  }
+  //############################################################################
   else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
@@ -3022,6 +3035,9 @@ void out_restart(void)
         fprintf(rest, "%e ", p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fprintf(rest, "%d ", phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fprintf(rest, "%d ", phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
+        fprintf(rest, "%e ", numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
       }
     }
   }
@@ -3285,9 +3301,15 @@ void in_restart(void)
 #ifdef DOUBLE
         fret = fscanf(infile, "%le ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%le ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
+        fret = fscanf(infile, "%le ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
 #else
         fret = fscanf(infile, "%e ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%e ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
+        fret = fscanf(infile, "%e ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //##############################################################
 #endif
         fret = fscanf(infile, "%d ", &phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%d ", &phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);

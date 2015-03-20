@@ -162,32 +162,54 @@ real pid_back;
 real Kp;
 real Ki;
 real Kd;
-//######################################################################
+//##############################################################################
 // used by Eulerian branch
+// number density equation
 real bubble_radius;
 real bubble_density;
 int bubble_init_cond;
 real bubble_init_cond_uniform_m;
+int bubble_init_cond_random_min;
+int bubble_init_cond_random_max;
 numdenBC_struct numdenBC;
 real *numden;
-real *u_p;
-real *v_p;
+real totalnumden;
+//real *u_p;
+//real *v_p;
 real *w_p;
 real **_numden;
 real **_nextnumden;
-real **_u_p;
-real **_v_p;
+//real **_u_p;
+//real **_v_p;
 real **_w_p;
+//real **_f_x_coupling_numden;
+//real **_f_y_coupling_numden;
+real **_f_z_coupling_numden;
 
+// concentration equation
 real concen_diff;
 real concen_diss;
 int concen_init_cond;
 real concen_init_cond_uniform_m;
+int concen_init_cond_random_min;
+int concen_init_cond_random_max;
 numdenBC_struct concenBC;
 real *concen;
 real **_concen;
 real **_nextconcen;
-//######################################################################
+real **_velmag;
+real **_mdot;
+
+// bubble volume equation
+real *bubvol;
+real **_bubvol;
+real **_nextbubvol;
+real **_bubdia;
+real **_bubdiafz;
+int bubvol_init_cond;
+numdenBC_struct bubvolBC;
+real bubvol_init_cond_uniform_m;
+//##############################################################################
 
 int main(int argc, char *argv[]) {
 
@@ -302,12 +324,12 @@ int main(int argc, char *argv[]) {
       fflush(stdout);
       domain_read_input();
       parts_read_input(turb);
-      //################################################################
-      // read number density
-      numberdensity_read_input();
-      // real concentration
-      concentration_read_input();
-      //################################################################
+      //########################################################################
+      // read config info
+      Eulerian_read_input();
+      // print config info
+      Eulerian_show_config();
+      //########################################################################
       printf("done.\n");
       fflush(stdout);
       //printf("FLOW: Using devices %d through %d.\n\n", dev_start, dev_end);
@@ -368,18 +390,19 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
       }
       
-      //################################################################
-      // initialize the number density field
-      printf("Initializing number density fields...");
+      domain_show_config();
+      //########################################################################
+      // initialization for Eulerian branch
+      printf("Initializing variables for Eulerian branch...");
       fflush(stdout);
-      int numberdensity_init_flag = numberdensity_init();
+      int Eulerian_init_flag = Eulerian_init();
       printf("done.\n");
       fflush(stdout);
-      if(numberdensity_init_flag == EXIT_FAILURE) {
-        printf("\nThe initial numberdensity configuration is not allowed.\n");
+      if(Eulerian_init_flag == EXIT_FAILURE) {
+        printf("\nThe initial configuration for Eulerian branch is not allowed.\n");
         return EXIT_FAILURE;
       }
-      //################################################################
+      //########################################################################
 
       // set up the boundary condition config info to send to precursor
       expd_init_BC(np);
@@ -407,9 +430,9 @@ int main(int argc, char *argv[]) {
       printf("...done.\n");
       fflush(stdout);
       //################################################################
-      printf("Allocating numberdensity CUDA device memory...");
+      printf("Allocating CUDA device memory for Eulerian branch...");
       fflush(stdout);
-      cuda_numberdensity_malloc();
+      cuda_Eulerian_malloc();
       printf("...done.\n");
       //################################################################
 
@@ -425,9 +448,9 @@ int main(int argc, char *argv[]) {
       printf("done.\n");
       fflush(stdout);
       //################################################################
-      printf("Copying host numberdensity data to devices...");
+      printf("Copying host data for Eulerian branch to devices...");
       fflush(stdout);
-      cuda_numberdensity_push();
+      cuda_Eulerian_push();
       printf("...done.\n");
       //################################################################
       
@@ -536,10 +559,14 @@ int main(int argc, char *argv[]) {
           cuda_part_BC();
         }
         cuda_dom_BC();
-        //##############################################################
+        //######################################################################
         // apply BC to number density field
         cuda_numberdensity_BC();
-        //##############################################################
+        //######################################################################
+        //######################################################################
+        // apply BC to concentration field
+        cuda_concentration_BC();
+        //######################################################################
 
         // write initial fields
         if(runrestart != 1) {
@@ -598,9 +625,38 @@ int main(int argc, char *argv[]) {
           stepnum++;
           printf("FLOW: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
           fflush(stdout);
-
+          
+          // everything is explicitly computed
+          //####################################################################
+          // compute bubble diameter
+          cuda_compute_bubble_diameter();
+          // calculate bubble velocity(only vertical direction)
+          cuda_compute_particle_velz();
+          // compute coupling force
+          cuda_compute_coupling_forcing();
+          // compute mass transfer rate
+          cuda_compute_mdot();
+          //####################################################################
+          
+          //####################################################################
+          // number density equation
+          cuda_numberdensity_march();
+          cuda_numberdensity_BC();
+          //####################################################################
+          //####################################################################
+          // concentration equation
+          cuda_concentration_march();
+          cuda_concentration_BC();
+          //####################################################################
+          //####################################################################
+          // bubble volume field
+          cuda_bubblevolume_march();
+          cuda_bubblevolume_BC();
+          //####################################################################
+          
           cuda_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);
           compute_vel_BC();
+          
           // update the boundary condition config info and share with precursor
           expd_update_BC(np, status);
 
@@ -610,10 +666,12 @@ int main(int argc, char *argv[]) {
           int iter = 0;
           real iter_err = FLT_MAX;
           while(iter_err > lamb_residual) {  // iterate for Lamb's coefficients
+            /*##################################################################
             #ifndef BATCHRUN
               printf("  Iteration %d: ", iter);
               fflush(stdout);
             #endif
+            ##################################################################*/
 
             // solve for U_star
             cuda_U_star_2();
@@ -646,17 +704,6 @@ int main(int argc, char *argv[]) {
             // update pressure
             cuda_update_p();
             cuda_dom_BC_p();
-            
-            
-            
-            //##########################################################
-            //add terminal velocity
-            cuda_numberdensity_particle_velz();
-            //march the number density equation
-            cuda_numberdensity_march();
-            // apply BC to number density field
-            cuda_numberdensity_BC();
-            //##########################################################
 
             // update Lamb's coefficients
             cuda_move_parts_sub();
@@ -670,9 +717,11 @@ int main(int argc, char *argv[]) {
               iter_err = cuda_lamb_err();
               // TODO: write error to lamb.rec
             #endif
+            /*##################################################################
             #ifndef BATCHRUN
               printf("Error = %f\r", iter_err);
             #endif
+            ##################################################################*/
             iter++;
             // check iteration limit
             if(iter == lamb_max_iter) {
@@ -683,10 +732,10 @@ int main(int argc, char *argv[]) {
               break;
             }
           }
-
+/*##############################################################################
           printf("  The Lamb's coefficients converged in");
           printf(" %d iterations.\n", iter);
-
+##############################################################################*/
           if(!lambflag) {
             // store u, conv, and coeffs for use in next timestep
             cuda_store_u();
@@ -733,9 +782,10 @@ int main(int argc, char *argv[]) {
               // pull back data and write fields
               cuda_dom_pull();
               cuda_part_pull();
-              //########################################################
-              cuda_numberdensity_pull();
-              //########################################################
+              //################################################################
+              cuda_Eulerian_pull();
+              //cuda_numberdensity_compute_totalnumden();
+              //################################################################
               #ifndef BATCHRUN
                 printf("  Writing ParaView output file");
                 printf(" %d (t = %e)...                  \r",
@@ -834,12 +884,12 @@ int main(int argc, char *argv[]) {
       cuda_part_free();
       printf("done.\n");
       fflush(stdout);
-      //################################################################
-      printf("Cleaning up numberdensity data on devices...");
+      //########################################################################
+      printf("Cleaning up data for Eulerian branch on devices...");
       fflush(stdout);
-      cuda_numberdensity_free();
+      cuda_Eulerian_free();
       printf("...done.\n");
-      //################################################################
+      //########################################################################
 
       // clean up host
       printf("Cleaning up particles...");
@@ -853,9 +903,9 @@ int main(int argc, char *argv[]) {
       printf("done.\n");
       fflush(stdout);
       //################################################################
-      printf("Cleaning up numberdensity...");
+      printf("Cleaning up variables for Eulerian branch...");
       fflush(stdout);
-      numberdensity_clean();
+      Eulerian_clean();
       printf("done.\n");
       //################################################################
 

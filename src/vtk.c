@@ -106,9 +106,10 @@ void dom_out_VTK(void)
     Dom.xn, Dom.yn, Dom.zn);
   //fprintf(outfile, "<PCellData Scalars=\"p divU phase phase_shell\" Vectors=\"vel flag\">\n");
 //######################################################################
-  fprintf(outfile, "<PCellData Scalars=\"p numden phase\" Vectors=\"vel\">\n");
+  fprintf(outfile, "<PCellData Scalars=\"p numden concen phase\" Vectors=\"vel\">\n");
   fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"p\"/>\n");
   fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"numden\"/>\n");
+  fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"concen\"/>\n");
 //######################################################################
   fprintf(outfile, "<PDataArray type=\"Int32\" Name=\"phase\"/>\n");
   //fprintf(outfile, "<PDataArray type=\"Int32\" Name=\"phase_shell\"/>\n");
@@ -207,7 +208,7 @@ void dom_out_VTK(void)
     fprintf(outfile, "%d %d\">\n", ncz_s, ncz_e);
     //fprintf(outfile, "<CellData Scalars=\"p divU phase phase_shell\" Vectors=\"vel flag\">\n");
 //######################################################################
-    fprintf(outfile, "<CellData Scalars=\"p numden phase\" Vectors=\"vel\">\n");
+    fprintf(outfile, "<CellData Scalars=\"p numden concen phase\" Vectors=\"vel\">\n");
 //######################################################################
     fprintf(outfile, "<DataArray type=\"Float32\" Name=\"p\">\n");
     // write pressure for this subdomain
@@ -223,12 +224,26 @@ void dom_out_VTK(void)
     fprintf(outfile, "</DataArray>\n");
 //######################################################################
     fprintf(outfile, "<DataArray type=\"Float32\" Name=\"numden\">\n");
-    // write pressure for this subdomain
+    // write numden for this subdomain
     for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
       for(j = ncy_s + Dom.Gcc.js; j < ncy_e + Dom.Gcc.js; j++) {
         for(i = ncx_s + Dom.Gcc.is; i < ncx_e + Dom.Gcc.is; i++) {
           C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
           fprintf(outfile, "%e ", numden[C]);
+        }
+      }
+    }
+    fprintf(outfile, "\n");
+    fprintf(outfile, "</DataArray>\n");
+//######################################################################
+//######################################################################
+    fprintf(outfile, "<DataArray type=\"Float32\" Name=\"concen\">\n");
+    // write concen for this subdomain
+    for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
+      for(j = ncy_s + Dom.Gcc.js; j < ncy_e + Dom.Gcc.js; j++) {
+        for(i = ncx_s + Dom.Gcc.is; i < ncx_e + Dom.Gcc.is; i++) {
+          C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+          fprintf(outfile, "%e ", concen[C]);
         }
       }
     }

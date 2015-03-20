@@ -208,5 +208,5 @@ __global__ void entrySearch_avg_entries_kernel(real *iarr, real *maxarr,
  *  * size -- the size of the input array
  ******
  */
-
+void getNumBlocksAndThreads(int n, int &blocks, int &threads);
 #endif

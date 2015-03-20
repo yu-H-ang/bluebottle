@@ -35,8 +35,9 @@ SRCCUDA = cuda_bluebottle.cu	\
 	entrySearch_kernel.cu	\
 	particle_kernel.cu	\
 	quadrature_kernel.cu	\
-	cuda_Eulerian.cu	\
-	cuda_Eulerian_kernel.cu
+	cuda_Eulerian_kernel.cu	\
+	cuda_Eulerian.cu
+	
 
 EXTRA = Makefile		\
 	bluebottle.h		\
