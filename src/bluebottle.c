@@ -174,16 +174,10 @@ int bubble_init_cond_random_max;
 numdenBC_struct numdenBC;
 real *numden;
 real totalnumden;
-//real *u_p;
-//real *v_p;
-real *w_p;
+real *w_b;
 real **_numden;
 real **_nextnumden;
-//real **_u_p;
-//real **_v_p;
-real **_w_p;
-//real **_f_x_coupling_numden;
-//real **_f_y_coupling_numden;
+real **_w_b;
 real **_f_z_coupling_numden;
 
 // concentration equation
@@ -200,15 +194,19 @@ real **_nextconcen;
 real **_velmag;
 real **_mdot;
 
-// bubble volume equation
-real *bubvol;
-real **_bubvol;
-real **_nextbubvol;
+// bubble mass equation
+real *bubmas;
+real **_bubmas;
+real **_nextbubmas;
 real **_bubdia;
 real **_bubdiafz;
-int bubvol_init_cond;
-numdenBC_struct bubvolBC;
-real bubvol_init_cond_uniform_m;
+int bubmas_init_cond;
+numdenBC_struct bubmasBC;
+real bubmas_init_cond_uniform_m;
+
+real pressure_atm;
+real rho_atm;
+real grav_acc;
 //##############################################################################
 
 int main(int argc, char *argv[]) {
@@ -327,8 +325,6 @@ int main(int argc, char *argv[]) {
       //########################################################################
       // read config info
       Eulerian_read_input();
-      // print config info
-      Eulerian_show_config();
       //########################################################################
       printf("done.\n");
       fflush(stdout);
@@ -390,7 +386,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
       }
       
-      domain_show_config();
       //########################################################################
       // initialization for Eulerian branch
       printf("Initializing variables for Eulerian branch...");
@@ -429,12 +424,12 @@ int main(int argc, char *argv[]) {
       cuda_part_malloc();
       printf("...done.\n");
       fflush(stdout);
-      //################################################################
+      //########################################################################
       printf("Allocating CUDA device memory for Eulerian branch...");
       fflush(stdout);
       cuda_Eulerian_malloc();
       printf("...done.\n");
-      //################################################################
+      //########################################################################
 
       // copy host data to devices
       printf("Copying host domain data to devices...");
@@ -447,12 +442,12 @@ int main(int argc, char *argv[]) {
       cuda_part_push();
       printf("done.\n");
       fflush(stdout);
-      //################################################################
+      //########################################################################
       printf("Copying host data for Eulerian branch to devices...");
       fflush(stdout);
       cuda_Eulerian_push();
       printf("...done.\n");
-      //################################################################
+      //########################################################################
       
       count_mem();
 
@@ -560,12 +555,10 @@ int main(int argc, char *argv[]) {
         }
         cuda_dom_BC();
         //######################################################################
-        // apply BC to number density field
+        // apply BC all fields in Eulerian branch
         cuda_numberdensity_BC();
-        //######################################################################
-        //######################################################################
-        // apply BC to concentration field
         cuda_concentration_BC();
+        cuda_bubblemass_BC();
         //######################################################################
 
         // write initial fields
@@ -612,7 +605,13 @@ int main(int argc, char *argv[]) {
 
         #endif
         }
-
+        
+        //######################################################################
+        // print config info
+        Eulerian_show_config();
+        //domain_show_config();
+        //######################################################################
+        
         /******************************************************************/
         /** Begin the main timestepping loop in the experimental domain. **/
         /******************************************************************/
@@ -642,16 +641,14 @@ int main(int argc, char *argv[]) {
           // number density equation
           cuda_numberdensity_march();
           cuda_numberdensity_BC();
-          //####################################################################
-          //####################################################################
+          
           // concentration equation
           cuda_concentration_march();
           cuda_concentration_BC();
-          //####################################################################
-          //####################################################################
-          // bubble volume field
-          cuda_bubblevolume_march();
-          cuda_bubblevolume_BC();
+          
+          // bubble mass field
+          cuda_bubblemass_march();
+          cuda_bubblemass_BC();
           //####################################################################
           
           cuda_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);

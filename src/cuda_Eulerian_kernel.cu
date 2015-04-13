@@ -11,6 +11,8 @@ __global__ void kernel_numberdensity_particle_velz(real val, real* velzp, real *
 		if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
 			int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
 			velzp[C] = velz[C] + val * dia[C] * dia[C];
+			
+			//if(ti==32 && tj==32 && k<3) printf("compute vel: k==%d, diafz==%f, velz==%f\n", k, dia[C], velzp[C]);
 		}
 	}
 }
@@ -199,16 +201,14 @@ __global__ void kernel_numden_inner_copy(dom_struct *dom, real *numd, real *numd
 }
 
 __global__ void kernel_compute_mdot(dom_struct *dom,
-									real *conc,
-									real *dia,
-									real *mdot,
-									real *velmag,
-									real *ux,
-									real *uy,
-									real *uz,
-									real ccdiss,
-									real ccdiff,
-									real nu)
+                                    real *numd,
+                                    real *conc,
+                                    real *dia,
+                                    real *mdot,
+                                    real scale,
+                                    real ccdiss,
+                                    real ccdiff,
+                                    real nu)
 {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	int tk = blockIdx.y * blockDim.y + threadIdx.y;
@@ -217,26 +217,26 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
 		for(int i = dom->Gcc._isb; i < dom->Gcc._ieb; i++) {
 			
 			int C   = i       + tj      *dom->Gcc._s1b + tk      *dom->Gcc._s2b;
-			int fx0 = i       + tj      *dom->Gfx._s1b + tk      *dom->Gfx._s2b;
-			int fx1 = (i + 1) + tj      *dom->Gfx._s1b + tk      *dom->Gfx._s2b;
-			int fy0 = i       + tj      *dom->Gfy._s1b + tk      *dom->Gfy._s2b;
-			int fy1 = i       + (tj + 1)*dom->Gfy._s1b + tk      *dom->Gfy._s2b;
-			int fz0 = i       + tj      *dom->Gfz._s1b + tk      *dom->Gfz._s2b;
-			int fz1 = i       + tj      *dom->Gfz._s1b + (tk + 1)*dom->Gfz._s2b;
+			//int fx0 = i       + tj      *dom->Gfx._s1b + tk      *dom->Gfx._s2b;
+			//int fx1 = (i + 1) + tj      *dom->Gfx._s1b + tk      *dom->Gfx._s2b;
+			//int fy0 = i       + tj      *dom->Gfy._s1b + tk      *dom->Gfy._s2b;
+			//int fy1 = i       + (tj + 1)*dom->Gfy._s1b + tk      *dom->Gfy._s2b;
+			//int fz0 = i       + tj      *dom->Gfz._s1b + tk      *dom->Gfz._s2b;
+			//int fz1 = i       + tj      *dom->Gfz._s1b + (tk + 1)*dom->Gfz._s2b;
 			
-			real uc = (ux[fx0] + ux[fx1])/2.0;
-			real vc = (uy[fy0] + uy[fy1])/2.0;
-			real wc = (uz[fz0] + uz[fz1])/2.0;
-			velmag[C] = sqrt(uc * uc + vc * vc + wc * wc);
-			
-			real Dia = dia[C];
-			real Re = velmag[C] * Dia / nu;
-			real Pr = nu / ccdiff;
-			real Nu = 2.0 + 0.6 * pow(Re, 0.5) * pow(Pr, 1.0/3.0);
-			real h = Nu * ccdiff / Dia;
-			real A = PI * Dia * Dia;
-			
-			mdot[C] = A * h * (conc[C] - ccdiss);
+			if(numd[C] > 0) {
+				real Dia = dia[C];
+				real tervel = scale * Dia * Dia;
+				real Re = tervel * Dia / nu;
+				real Sc = nu / ccdiff;
+				real Sh = 2.0 + 0.6 * pow(Re, 0.5) * pow(Sc, 1.0/3.0);
+				real h = Sh * ccdiff / Dia;
+				real A = PI * Dia * Dia;
+				mdot[C] = A * h * (conc[C] - ccdiss);
+			} else {
+				mdot[C] = 0;
+			}
+			//printf("i==%d, j==%d, k==%d, dia==%f, mdot==%f\n", i, tj, tk, dia[C], mdot[C]);
 		}
 	}
 }
@@ -267,36 +267,71 @@ __global__ void BC_p_T_D(real *p, dom_struct *dom, real bc)
 		p[ti + tj*s1b + (dom->Gcc._keb-1)*s2b] = 2 * bc - p[ti + tj*s1b + (dom->Gcc._ke-1)*s2b];
 }
 
-__global__ void kernel_compute_bubble_diameter(dom_struct *dom, real *vol, real *dia)
+__global__ void kernel_compute_bubble_diameter(dom_struct *dom,
+                                               real *mas,
+                                               real *numd,
+                                               real *dia,
+                                               real rho_fluid,
+                                               real pre_a,
+                                               real rho_a,
+                                               real gravacc)
 {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	int tk = blockIdx.y * blockDim.y + threadIdx.y;
 	if(tj < dom->Gcc._jeb && tk < dom->Gcc._keb) {
 		for(int i = dom->Gcc._isb; i < dom->Gcc._ieb; i++) {
+			
 			int C = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
-			dia[C] = pow(6.0*vol[C]/PI, 1.0/3.0);
+			
+			if(numd[C] > 0) {
+				real h = ((real)(dom->Gcc._keb - tk) - 1.5) * dom->dz;
+				real rho = rho_a * (1.0 + rho_fluid * gravacc * h / pre_a);
+				real vol = mas[C] / numd[C] / rho;
+				dia[C] = pow(6.0 * vol / PI, 1.0/3.0);
+			} else {
+				dia[C] = 0;
+			}
+			//if(i==32 && tj==32 && tk<10) printf("compute bub dia: k==%d, diafz==%f\n", tk, dia[C]);
 		}
 	}
 }
 
 __global__ void kernel_compute_bubble_diameterfz(dom_struct *dom,
-                                                 real *dia,
-                                                 real *diafz)
+                                                 real *mas,
+                                                 real *numfz,
+                                                 real *diafz,
+                                                 real rho_fluid,
+                                                 real pre_a,
+                                                 real rho_a,
+                                                 real gravacc)
 {
 	int ti = blockIdx.x * blockDim.x + threadIdx.x;
 	int tj = blockIdx.y * blockDim.y + threadIdx.y;
 	if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
 		for(int k = dom->Gfz._ks; k < dom->Gfz._ke; k++) {
+			
 			int C  = ti + tj*dom->Gfz._s1b + k      *dom->Gfz._s2b;
-			int C0 = ti + tj*dom->Gfz._s1b + (k - 1)*dom->Gfz._s2b;
-			diafz[C] = (dia[C] + dia[C0])/2.0;
+			int C0 = ti + tj*dom->Gcc._s1b + (k - 1)*dom->Gcc._s2b;
+			int C1 = ti + tj*dom->Gcc._s1b + k      *dom->Gcc._s2b;
+			
+			real mass_fz = 0.5 * (mas[C0] + mas[C1]);
+			
+			if(mass_fz > 0 && numfz[C] > 0) {
+				real h = ((real)(dom->Gcc._keb - k) - 2.0) * dom->dz;
+				real rho = rho_a * (1.0 + rho_fluid * gravacc * h / pre_a);
+				real vol = mass_fz / numfz[C] / rho;
+				diafz[C] = pow(6.0 * vol / PI, 1.0/3.0);
+			} else {
+				diafz[C] = 0;
+			}
+			//if(ti==32 && tj==32 && k<10) printf("compute bub diafz: k==%d, diafz==%f\n", k, diafz[C]);
 		}
 	}
 }
 
 __global__ void kernel_forcing_add_z_field_bubble(real scale,
-                                                  real *nd,
-                                                  real *dia,
+                                                  real *ndfz,
+                                                  real *diafz,
                                                   real *fz,
                                                   dom_struct *dom)
 {
@@ -306,7 +341,10 @@ __global__ void kernel_forcing_add_z_field_bubble(real scale,
 	if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
 		for(int k = dom->Gfz._ksb; k < dom->Gfz._keb; k++) {
 			int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
-			fz[C] += scale * nd[C] * dia[C] * dia[C] * dia[C];
+			fz[C] += scale * ndfz[C] * diafz[C] * diafz[C] * diafz[C];
+			
+			//if(ti==32 && tj==32 && k<10)
+			//printf("forcing: k==%d, fz==%f, nd==%f, diafz==%f\n", k, fz[C], ndfz[C], diafz[C]);
 		}
 	}
 }
@@ -326,15 +364,15 @@ __global__ void kernel_inner_scalarfield_update_x(dom_struct *dom,
 	}
 }
 
-__global__ void kernel_march_bubblevolume(real dt,
-										  dom_struct *dom,
-										  real *bubv,
-										  real *bubv1,
-										  real *ux,
-										  real *uy,
-										  real *uz,
-										  real *mdot,
-										  real rhog)
+__global__ void kernel_march_bubblemass(real dt,
+										dom_struct *dom,
+										real *bubm,
+										real *bubm1,
+										real *ux,
+										real *uy,
+										real *uz,
+										real *numd,
+										real *mdot)
 {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
 	int tk = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
@@ -355,20 +393,33 @@ __global__ void kernel_march_bubblevolume(real dt,
 			int fy1 = i       + (tj + 1)*dom->Gfy._s1b + tk      *dom->Gfy._s2b;
 			int fz0 = i       + tj      *dom->Gfz._s1b + tk      *dom->Gfz._s2b;
 			int fz1 = i       + tj      *dom->Gfz._s1b + (tk + 1)*dom->Gfz._s2b;
-			
+			/*
 			real ux_c = 0.5 * (ux[fx0] + ux[fx1]);
 			real uy_c = 0.5 * (uy[fy0] + uy[fy1]);
 			real uz_c = 0.5 * (uz[fz0] + uz[fz1]);
 			
-			real pv_x = 0.5 * (1.0 - copysign(1.0, ux_c)) * (bubv[Cx1] - bubv[C]) + 0.5 * (1.0 + copysign(1.0, ux_c)) * (bubv[C] - bubv[Cx0]);
-			real pv_y = 0.5 * (1.0 - copysign(1.0, uy_c)) * (bubv[Cy1] - bubv[C]) + 0.5 * (1.0 + copysign(1.0, uy_c)) * (bubv[C] - bubv[Cy0]);
-			real pv_z = 0.5 * (1.0 - copysign(1.0, uz_c)) * (bubv[Cz1] - bubv[C]) + 0.5 * (1.0 + copysign(1.0, uz_c)) * (bubv[C] - bubv[Cz0]);
+			real pv_x = 0.5 * (1.0 - copysign(1.0, ux_c)) * (bubm[Cx1] - bubm[C]) + 0.5 * (1.0 + copysign(1.0, ux_c)) * (bubm[C] - bubm[Cx0]);
+			real pv_y = 0.5 * (1.0 - copysign(1.0, uy_c)) * (bubm[Cy1] - bubm[C]) + 0.5 * (1.0 + copysign(1.0, uy_c)) * (bubm[C] - bubm[Cy0]);
+			real pv_z = 0.5 * (1.0 - copysign(1.0, uz_c)) * (bubm[Cz1] - bubm[C]) + 0.5 * (1.0 + copysign(1.0, uz_c)) * (bubm[C] - bubm[Cz0]);
 			
 			pv_x = pv_x / dom->dx * ux_c * dt;
 			pv_y = pv_y / dom->dy * uy_c * dt;
 			pv_z = pv_z / dom->dz * uz_c * dt;
+			*/
 			
-			bubv1[C] = bubv[C] - pv_x - pv_y - pv_z - mdot[C] /rhog * dt;
+			real m_x1 = 0.5 * (1.0 - copysign(1.0, ux[fx1])) * bubm[Cx1] + 0.5 * (1.0 + copysign(1.0, ux[fx1])) * bubm[C];
+			real m_y1 = 0.5 * (1.0 - copysign(1.0, uy[fy1])) * bubm[Cy1] + 0.5 * (1.0 + copysign(1.0, uy[fy1])) * bubm[C];
+			real m_z1 = 0.5 * (1.0 - copysign(1.0, uz[fz1])) * bubm[Cz1] + 0.5 * (1.0 + copysign(1.0, uz[fz1])) * bubm[C];
+			
+			real m_x0 = 0.5 * (1.0 - copysign(1.0, ux[fx0])) * bubm[C] + 0.5 * (1.0 + copysign(1.0, ux[fx0])) * bubm[Cx0];
+			real m_y0 = 0.5 * (1.0 - copysign(1.0, uy[fy0])) * bubm[C] + 0.5 * (1.0 + copysign(1.0, uy[fy0])) * bubm[Cy0];
+			real m_z0 = 0.5 * (1.0 - copysign(1.0, uz[fz0])) * bubm[C] + 0.5 * (1.0 + copysign(1.0, uz[fz0])) * bubm[Cz0];
+			
+			real mx = dt / dom->dx * (ux[fx1] * m_x1 - ux[fx0] * m_x0);
+			real my = dt / dom->dy * (uy[fy1] * m_y1 - uy[fy0] * m_y0);
+			real mz = dt / dom->dz * (uz[fz1] * m_z1 - uz[fz0] * m_z0);
+			
+			bubm1[C] = bubm[C] - mx - my - mz + numd[C] * mdot[C] * dt;
 		}
 	}
 }

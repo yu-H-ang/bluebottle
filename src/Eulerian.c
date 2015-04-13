@@ -18,13 +18,15 @@ void Eulerian_read_input(void)
 	
 	//==========================================================================
 	
-	fret = fscanf(infile, "BUBBLE PARAMETERS\n");
+	fret = fscanf(infile, "ATMOSHPERE PARAMETERS\n");
 	#ifdef DOUBLE
-		fret = fscanf(infile, "bubble_radius %lf\n", &bubble_radius);
-		fret = fscanf(infile, "bubble_density %lf\n", &bubble_density);
+		fret = fscanf(infile, "rho_atm %lf\n", &rho_atm);
+		fret = fscanf(infile, "pressure_atm %lf\n", &pressure_atm);
+		fret = fscanf(infile, "grav_acc %lf\n", &grav_acc);
 	#else // single
-		fret = fscanf(infile, "bubble_radius %f\n", &bubble_radius);
-		fret = fscanf(infile, "bubble_density %f\n", &bubble_density);
+		fret = fscanf(infile, "rho_atm %f\n", &rho_atm);
+		fret = fscanf(infile, "pressure_atm %f\n", &pressure_atm);
+		fret = fscanf(infile, "grav_acc %f\n", &grav_acc);
 	#endif
 	
 	fret = fscanf(infile, "\n");//==============================================
@@ -136,62 +138,62 @@ void Eulerian_read_input(void)
 	
 	fret = fscanf(infile, "\n");//==============================================
 	
-	fret = fscanf(infile, "BUBBLE VOLUME BOUNDARY CONDITIONS\n");
+	fret = fscanf(infile, "BUBBLE MASS BOUNDARY CONDITIONS\n");
 	
-	fret = fscanf(infile, "bubvolBC.nW %s\n", buf);
+	fret = fscanf(infile, "bubmasBC.nW %s\n", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nW = PERIODIC;
+		bubmasBC.nW = PERIODIC;
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
 	}
 	
-	fret = fscanf(infile, "bubvolBC.nE %s\n", buf);
+	fret = fscanf(infile, "bubmasBC.nE %s\n", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nE = PERIODIC;
+		bubmasBC.nE = PERIODIC;
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
 	}
 	
-	fret = fscanf(infile, "bubvolBC.nS %s\n", buf);
+	fret = fscanf(infile, "bubmasBC.nS %s\n", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nS = PERIODIC;
+		bubmasBC.nS = PERIODIC;
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
 	}
 	
-	fret = fscanf(infile, "bubvolBC.nN %s\n", buf);
+	fret = fscanf(infile, "bubmasBC.nN %s\n", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nN = PERIODIC;
+		bubmasBC.nN = PERIODIC;
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
 	}
 	
-	fret = fscanf(infile, "bubvolBC.nB %s", buf);
+	fret = fscanf(infile, "bubmasBC.nB %s", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nB = PERIODIC;
+		bubmasBC.nB = PERIODIC;
 	} else if(strcmp(buf, "DIRICHLET") == 0) {
-		bubvolBC.nB = DIRICHLET;
-		fret = fscanf(infile, " %lf", &bubvolBC.nBD);
+		bubmasBC.nB = DIRICHLET;
+		fret = fscanf(infile, " %lf", &bubmasBC.nBD);
 	} else if(strcmp(buf, "NEUMANN") == 0) {
-		bubvolBC.nB = NEUMANN;
+		bubmasBC.nB = NEUMANN;
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
 	}
 	fret = fscanf(infile, "\n");
 	
-	fret = fscanf(infile, "bubvolBC.nT %s", buf);
+	fret = fscanf(infile, "bubmasBC.nT %s", buf);
 	if(strcmp(buf, "PERIODIC") == 0) {
-		bubvolBC.nT = PERIODIC;
+		bubmasBC.nT = PERIODIC;
 	} else if(strcmp(buf, "DIRICHLET") == 0) {
-		bubvolBC.nT = DIRICHLET;
-		fret = fscanf(infile, " %lf", &bubvolBC.nTD);
+		bubmasBC.nT = DIRICHLET;
+		fret = fscanf(infile, " %lf", &bubmasBC.nTD);
 	} else if(strcmp(buf, "NEUMANN") == 0) {
-		bubvolBC.nT = NEUMANN;
+		bubmasBC.nT = NEUMANN;
 	} else {
 	fprintf(stderr, "Eulerian.config read error.\n");
 		exit(EXIT_FAILURE);
@@ -200,12 +202,12 @@ void Eulerian_read_input(void)
 	
 	fret = fscanf(infile, "\n");//==============================================
 	
-	fret = fscanf(infile, "BUBBLE VOLUME INITIAL CONDITION\n");
-	fret = fscanf(infile, "bubvol_init_cond %s", buf);
+	fret = fscanf(infile, "BUBBLE MASS INITIAL CONDITION\n");
+	fret = fscanf(infile, "bubmas_init_cond %s", buf);
 	#ifdef DOUBLE
 	if(strcmp(buf, "UNIFORM") == 0) {
-		bubvol_init_cond = UNIFORM;
-		fret = fscanf(infile, " %lf\n", &bubvol_init_cond_uniform_m);
+		bubmas_init_cond = UNIFORM;
+		fret = fscanf(infile, " %lf\n", &bubmas_init_cond_uniform_m);
 	} else if(strcmp(buf, "RANDOM") == 0) {
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
@@ -213,8 +215,8 @@ void Eulerian_read_input(void)
 	}
 	#else
 	if(strcmp(buf, "UNIFORM") == 0) {
-		bubvol_init_cond = UNIFORM;
-		fret = fscanf(infile, " %f\n", &bubvol_init_cond_uniform_m;);
+		bubmas_init_cond = UNIFORM;
+		fret = fscanf(infile, " %f\n", &bubmas_init_cond_uniform_m;);
 	} else if(strcmp(buf, "RANDOM") == 0) {
 	} else {
 		fprintf(stderr, "Eulerian.config read error.\n");
@@ -320,11 +322,9 @@ void Eulerian_read_input(void)
 void Eulerian_clean(void)
 {
 	free(numden);
-	free(bubvol);
+	free(bubmas);
 	free(concen);
-	//free(u_p);
-	//free(v_p);
-	free(w_p);
+	free(w_b);
  }
 
 int Eulerian_init(void)
@@ -339,15 +339,11 @@ int Eulerian_init(void)
 	// allocate memory
 	numden = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
-	//u_p = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-	//cpumem += Dom.Gfx.s3b * sizeof(real);
-	//v_p = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-	//cpumem += Dom.Gfy.s3b * sizeof(real);
-	w_p = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
+	w_b = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
 	cpumem += Dom.Gfz.s3b * sizeof(real);
 	concen = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
-	bubvol = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
+	bubmas = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	
 	// initialize UNIFORM number density field
@@ -356,7 +352,7 @@ int Eulerian_init(void)
 			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
 				for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
 					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					numden[C] = bubble_init_cond_uniform_m * k;
+					numden[C] = bubble_init_cond_uniform_m;
 				}
 			}
 		}
@@ -373,13 +369,13 @@ int Eulerian_init(void)
 			}
 		}
 	}
-	// initialize UNIFORM bubble volume field
-	if(bubvol_init_cond == UNIFORM) {
+	// initialize UNIFORM bubble mass field
+	if(bubmas_init_cond == UNIFORM) {
 		for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
 			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
 				for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
 					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					bubvol[C] = bubvol_init_cond_uniform_m;
+					bubmas[C] = bubmas_init_cond_uniform_m;
 				}
 			}
 		}
@@ -409,16 +405,8 @@ int Eulerian_init(void)
 	}
 	
 	// initialize particle velocity field to be quiescent;
-	/*
-	for(i = 0; i < Dom.Gfx.s3b; i++) {
-		u_p[i] = 0.;
-	}
-	for(j = 0; j < Dom.Gfy.s3b; j++) {
-		v_p[i] = 0.;
-	}
-	*/
 	for(k = 0; k < Dom.Gfz.s3b; k++) {
-		w_p[k] = 0.;
+		w_b[k] = 0.;
 	}
 	
 	// initialize some values
@@ -439,11 +427,13 @@ int Eulerian_init(void)
 void Eulerian_show_config()
 {
 	printf("########################################################################\n");
-	printf("BUBBLE PARAMETERS\n");
-	printf("bubble_radius ");
-	printf("%f\n", bubble_radius);
-	printf("bubble_density ");
-	printf("%f\n", bubble_density);
+	printf("ATMOSHPERE PARAMETERS\n");
+	printf("rho_atm ");
+	printf("%f\n", rho_atm);
+	printf("pressure_atm ");
+	printf("%f\n", pressure_atm);
+	printf("grav_acc ");
+	printf("%f\n", grav_acc);
 	printf("\n");
 	
 	printf("DISSOLUTION PARAMETERS\n");
@@ -502,48 +492,48 @@ void Eulerian_show_config()
 	}
 	printf("\n");
 	
-	printf("BUBBLE VOLUME BOUNDARY CONDITIONS\n");
-	printf("bubvolBC.nW ");
-	if(bubvolBC.nW == PERIODIC) {
+	printf("BUBBLE MASS BOUNDARY CONDITIONS\n");
+	printf("bubmasBC.nW ");
+	if(bubmasBC.nW == PERIODIC) {
 		printf("PERIODIC\n");
 	}
-	printf("bubvolBC.nE ");
-	if(bubvolBC.nE == PERIODIC) {
+	printf("bubmasBC.nE ");
+	if(bubmasBC.nE == PERIODIC) {
 		printf("PERIODIC\n");
 	}
-	printf("bubvolBC.nS ");
-	if(bubvolBC.nS == PERIODIC) {
+	printf("bubmasBC.nS ");
+	if(bubmasBC.nS == PERIODIC) {
 		printf("PERIODIC\n");
 	}
-	printf("bubvolBC.nN ");
-	if(bubvolBC.nN == PERIODIC) {
+	printf("bubmasBC.nN ");
+	if(bubmasBC.nN == PERIODIC) {
 		printf("PERIODIC\n");
 	}
-	printf("bubvolBC.nB ");
-	if(bubvolBC.nB == PERIODIC) {
+	printf("bubmasBC.nB ");
+	if(bubmasBC.nB == PERIODIC) {
 		printf("PERIODIC\n");
-	} else if(bubvolBC.nB == DIRICHLET) {
+	} else if(bubmasBC.nB == DIRICHLET) {
 		printf("DIRICHLET ");
-		printf("%f\n", bubvolBC.nBD);
-	} else if(bubvolBC.nB == NEUMANN) {
+		printf("%f\n", bubmasBC.nBD);
+	} else if(bubmasBC.nB == NEUMANN) {
 		printf("NEUMANN\n");
 	}
-	printf("bubvolBC.nT ");
-	if(bubvolBC.nT == PERIODIC) {
+	printf("bubmasBC.nT ");
+	if(bubmasBC.nT == PERIODIC) {
 		printf("PERIODIC\n");
-	} else if(bubvolBC.nT == DIRICHLET) {
+	} else if(bubmasBC.nT == DIRICHLET) {
 		printf("DIRICHLET ");
-		printf("%f\n", bubvolBC.nTD);
-	} else if(bubvolBC.nT == NEUMANN) {
+		printf("%f\n", bubmasBC.nTD);
+	} else if(bubmasBC.nT == NEUMANN) {
 		printf("NEUMANN\n");
 	}
 	printf("\n");
 	
-	printf("BUBBLE VOLUME INITIAL CONDITION\n");
-	printf("bubvol_init_cond ");
-	if(bubvol_init_cond == UNIFORM) {
+	printf("BUBBLE MASS INITIAL CONDITION\n");
+	printf("bubmas_init_cond ");
+	if(bubmas_init_cond == UNIFORM) {
 		printf("UNIFORM ");
-		printf("%f\n", bubvol_init_cond_uniform_m);
+		printf("%f\n", bubmas_init_cond_uniform_m);
 	}
 	printf("\n");
 	
@@ -596,5 +586,15 @@ void Eulerian_show_config()
 	}
 	printf("\n");
 	
+	printf("########################################################################\n");
+	printf("Some important information\n");
+	//printf("%lf\n",Dom.zl);
+	real rho_bot = rho_atm * (1.0 + rho_f * grav_acc * Dom.zl / pressure_atm);
+	real mass_init = bubmasBC.nBD / numdenBC.nBD;
+	real v_init = mass_init / rho_bot;
+	real d_init = pow(6.0 * v_init / PI, 1./3.);
+	real u_ter_init = d_init * d_init * (rho_f - rho_bot) * grav_acc / 18 / mu;
+	printf("bubble density at bottom: %f\n", rho_bot);
+	printf("terminal velocity: %f\n", u_ter_init);
 	printf("########################################################################\n");
 }

@@ -3138,9 +3138,11 @@ void cuda_project(void)
 extern "C"
 real cuda_find_dt(void)
 {
+  //############################################################################
   // results from all devices
-  real *dts = (real*) malloc(nsubdom * sizeof(real));
+  real *dts0 = (real*) malloc(nsubdom * sizeof(real));
     // cpumem += nsubdom * sizeof(real);
+  real *dts1 = (real*) malloc(nsubdom * sizeof(real));
 
   // parallelize over CPU threads
   #pragma omp parallel num_threads(nsubdom)
@@ -3152,27 +3154,36 @@ real cuda_find_dt(void)
     real u_max = find_max_mag(dom[dev].Gfx.s3b, _u[dev]);
     real v_max = find_max_mag(dom[dev].Gfy.s3b, _v[dev]);
     real w_max = find_max_mag(dom[dev].Gfz.s3b, _w[dev]);
-
-    dts[dev] = (u_max + 2. * nu / dom[dev].dx) / dom[dev].dx;
-    dts[dev] += (v_max + 2. * nu / dom[dev].dy) / dom[dev].dy;
-    dts[dev] += (w_max + 2. * nu / dom[dev].dz) / dom[dev].dz;
-    //##########################################################################
-    //according to the notes from shigan
-    dts[dev] += u_max * u_max / (2.0 * nu);
-    dts[dev] += v_max * v_max / (2.0 * nu);
-    dts[dev] += w_max * w_max / (2.0 * nu);
-    //##########################################################################
-    dts[dev] = CFL / dts[dev];
+    real wp_max = find_max_mag(dom[dev].Gfz.s3b, _w_b[dev]);
+    
+    dts0[dev] = (u_max + 2. * nu / dom[dev].dx) / dom[dev].dx;
+    dts0[dev] += (v_max + 2. * nu / dom[dev].dy) / dom[dev].dy;
+    dts0[dev] += (w_max + 2. * nu / dom[dev].dz) / dom[dev].dz;
+    //dts0[dev] += u_max * u_max / (2.0 * nu);
+    //dts0[dev] += v_max * v_max / (2.0 * nu);
+    //dts0[dev] += w_max * w_max / (2.0 * nu);
+    dts0[dev] = CFL / dts0[dev];
+    
+    dts1[dev] = (u_max + 2. * concen_diff / dom[dev].dx) / dom[dev].dx;
+    dts1[dev] += (v_max + 2. * concen_diff / dom[dev].dy) / dom[dev].dy;
+    dts1[dev] += (wp_max + 2. * concen_diff / dom[dev].dz) / dom[dev].dz;
+    //dts1[dev] += u_max * u_max / (2.0 * concen_diff);
+    //dts1[dev] += v_max * v_max / (2.0 * concen_diff);
+    //dts1[dev] += wp_max * wp_max / (2.0 * concen_diff);
+    dts1[dev] = CFL / dts1[dev];
+    
+    if(dts1[dev] < dts0[dev]) dts0[dev] = dts1[dev];
   }
 
   // find min of all devices
   real min = FLT_MAX;
   for(int i = 0; i < nsubdom; i++)
-    if(dts[i] < min) min = dts[i];
+    if(dts0[i] < min) min = dts0[i];
 
   // clean up
-  free(dts);
-
+  free(dts0);
+  free(dts1);
+  //############################################################################
   return min;
 }
 

@@ -49,13 +49,11 @@ __global__ void kernel_numden_inner_copy(dom_struct *dom,
                                          real *numd_tmp);
 
 __global__ void kernel_compute_mdot(dom_struct *dom,
+                                    real *numd,
                                     real *conc,
                                     real *dia,
-                                    real *mdot,
-                                    real *velmag,
-                                    real *ux,
-                                    real *uy, 
-                                    real *uz,
+                                    real *mdot, 
+                                    real scale,
                                     real ccdiss,
                                     real ccdiff,
                                     real nu);
@@ -69,12 +67,17 @@ __global__ void BC_p_T_D(real *p,
                          real bc);
 
 __global__ void kernel_compute_bubble_diameter(dom_struct *dom,
-                                               real *vol,
-                                               real *dia);
+                                               real *mas,
+                                               real *numd,
+                                               real *dia,
+                                               real rho_fluid,
+                                               real pre_a,
+                                               real rho_a,
+                                               real gravacc);
 
 __global__ void kernel_forcing_add_z_field_bubble(real scale,
-                                                  real *nd,
-                                                  real *dia,
+                                                  real *ndfz,
+                                                  real *diafz,
                                                   real *fz,
                                                   dom_struct *dom);
 
@@ -83,18 +86,22 @@ __global__ void kernel_inner_scalarfield_update_x(dom_struct *dom,
                                                   real *left,
                                                   real *right);
  
-__global__ void kernel_march_bubblevolume(real dt,
-                                          dom_struct *dom,
-                                          real *bubv,
-                                          real *bubv1,
-                                          real *ux,
-                                          real *uy,
-                                          real *uz,
-                                          real *mdot,
-                                          real rhog);
+__global__ void kernel_march_bubblemass(real dt,
+                                        dom_struct *dom,
+                                        real *bubm,
+                                        real *bubm1,
+                                        real *ux,
+                                        real *uy,
+                                        real *uz,
+                                        real *numd,
+                                        real *mdot);
  
  __global__ void kernel_compute_bubble_diameterfz(dom_struct *dom,
-                                                  real *dia,
-                                                  real *diafz);
- 
+                                                  real *mas,
+                                                  real *numfz,
+                                                  real *diafz,
+                                                  real rho_fluid,
+                                                  real pre_a,
+                                                  real rho_a,
+                                                  real gravacc);
 #endif

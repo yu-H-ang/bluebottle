@@ -43,16 +43,10 @@ typedef struct numdenBC_struct {
 extern numdenBC_struct numdenBC;
 extern real *numden;
 extern real totalnumden;
-//extern real *u_p;
-//extern real *v_p;
-extern real *w_p;
+extern real *w_b;
 extern real **_numden;
 extern real **_nextnumden;
-//extern real **_u_p;
-//extern real **_v_p;
-extern real **_w_p;
-//extern real **_f_x_coupling_numden;
-//extern real **_f_y_coupling_numden;
+extern real **_w_b;
 extern real **_f_z_coupling_numden;
 
 void cuda_numberdensity_BC(void);
@@ -77,18 +71,22 @@ extern real **_mdot;
 void cuda_concentration_BC(void);
 void cuda_concentration_march(void);
 //======================================================================
-// bubble volume equation
+// bubble mass equation
 
-extern real *bubvol;
-extern real **_bubvol;
-extern real **_nextbubvol;
+extern real *bubmas;
+extern real **_bubmas;
+extern real **_nextbubmas;
 extern real **_bubdia;
 extern real **_bubdiafz;
-extern int bubvol_init_cond;
-extern numdenBC_struct bubvolBC;
-extern real bubvol_init_cond_uniform_m;
+extern int bubmas_init_cond;
+extern numdenBC_struct bubmasBC;
+extern real bubmas_init_cond_uniform_m;
 
-void cuda_bubblevolume_BC(void);
-void cuda_bubblevolume_march(void);
+extern real pressure_atm;
+extern real rho_atm;
+extern real grav_acc;
+
+void cuda_bubblemass_BC(void);
+void cuda_bubblemass_march(void);
 //======================================================================
 #endif

@@ -3035,9 +3035,11 @@ void out_restart(void)
         fprintf(rest, "%e ", p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fprintf(rest, "%d ", phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fprintf(rest, "%d ", phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        //######################################################################
         fprintf(rest, "%e ", numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        fprintf(rest, "%e ", bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        fprintf(rest, "%e ", concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //######################################################################
       }
     }
   }
@@ -3301,15 +3303,19 @@ void in_restart(void)
 #ifdef DOUBLE
         fret = fscanf(infile, "%le ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%le ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        //######################################################################
         fret = fscanf(infile, "%le ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        fret = fscanf(infile, "%le ", &bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        fret = fscanf(infile, "%le ", &concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //######################################################################
 #else
         fret = fscanf(infile, "%e ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%e ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        //######################################################################
         fret = fscanf(infile, "%e ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //##############################################################
+        fret = fscanf(infile, "%e ", &bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        fret = fscanf(infile, "%e ", &concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
+        //######################################################################
 #endif
         fret = fscanf(infile, "%d ", &phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
         fret = fscanf(infile, "%d ", &phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
