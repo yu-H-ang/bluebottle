@@ -2,15 +2,22 @@
 #include <math.h>
 #include "bluebottle.h"
 
-__global__ void kernel_numberdensity_particle_velz(real val, real* velzp, real *velz, real *dia, dom_struct *dom)
+__global__ void kernel_numberdensity_particle_velz(real val,
+                                                   real* velzp,
+                                                   real *velz,
+                                                   real *dia,
+                                                   dom_struct *dom,
+                                                   real *bdenf,
+                                                   real rho_fluid)
 {
 	int ti = blockIdx.x * blockDim.x + threadIdx.x;
 	int tj = blockIdx.y * blockDim.y + threadIdx.y;
 	
 	for(int k = dom->Gfz._ksb; k < dom->Gfz._keb; k++) {
 		if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
+			
 			int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
-			velzp[C] = velz[C] + val * dia[C] * dia[C];
+			velzp[C] = velz[C] + val * dia[C] * dia[C] * (rho_fluid - bdenf[C]);
 			
 			//if(ti==32 && tj==32 && k<3) printf("compute vel: k==%d, diafz==%f, velz==%f\n", k, dia[C], velzp[C]);
 		}
@@ -204,11 +211,13 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
                                     real *numd,
                                     real *conc,
                                     real *dia,
+                                    real *bdenf,
                                     real *mdot,
                                     real scale,
                                     real ccdiss,
                                     real ccdiff,
-                                    real nu)
+                                    real nu,
+                                    real rho_fluid)
 {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	int tk = blockIdx.y * blockDim.y + threadIdx.y;
@@ -226,7 +235,7 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
 			
 			if(numd[C] > 0) {
 				real Dia = dia[C];
-				real tervel = scale * Dia * Dia;
+				real tervel = scale * abs(rho_fluid - bdenf[C]) * Dia * Dia;
 				real Re = tervel * Dia / nu;
 				real Sc = nu / ccdiff;
 				real Sh = 2.0 + 0.6 * pow(Re, 0.5) * pow(Sc, 1.0/3.0);
@@ -333,7 +342,9 @@ __global__ void kernel_forcing_add_z_field_bubble(real scale,
                                                   real *ndfz,
                                                   real *diafz,
                                                   real *fz,
-                                                  dom_struct *dom)
+                                                  dom_struct *dom,
+                                                  real *bdenf,
+                                                  real rho_fluid)
 {
 	int ti = blockIdx.x * blockDim.x + threadIdx.x;
 	int tj = blockIdx.y * blockDim.y + threadIdx.y;
@@ -341,7 +352,8 @@ __global__ void kernel_forcing_add_z_field_bubble(real scale,
 	if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
 		for(int k = dom->Gfz._ksb; k < dom->Gfz._keb; k++) {
 			int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
-			fz[C] += scale * ndfz[C] * diafz[C] * diafz[C] * diafz[C];
+			
+			fz[C] += scale * ndfz[C] * diafz[C] * diafz[C] * diafz[C] * (rho_fluid - bdenf[C]);
 			
 			//if(ti==32 && tj==32 && k<10)
 			//printf("forcing: k==%d, fz==%f, nd==%f, diafz==%f\n", k, fz[C], ndfz[C], diafz[C]);

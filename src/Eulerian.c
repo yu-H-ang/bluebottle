@@ -1,4 +1,5 @@
 #include "Eulerian.h"
+#include "recorder.h"
 
 void Eulerian_read_input(void)
 {
@@ -28,6 +29,14 @@ void Eulerian_read_input(void)
 		fret = fscanf(infile, "pressure_atm %f\n", &pressure_atm);
 		fret = fscanf(infile, "grav_acc %f\n", &grav_acc);
 	#endif
+	fret = fscanf(infile, "gravity_direction %s\n", buf);
+	if(strcmp(buf, "GRAVITY_X") == 0) {
+		gravity_direction = GRAVITY_X;
+	} else if(strcmp(buf, "GRAVITY_Y") == 0) {
+		gravity_direction = GRAVITY_Y;
+	} else if(strcmp(buf, "GRAVITY_Z") == 0) {
+		gravity_direction = GRAVITY_Z;
+	}
 	
 	fret = fscanf(infile, "\n");//==============================================
 	
@@ -330,6 +339,7 @@ void Eulerian_clean(void)
 int Eulerian_init(void)
 {
 	int i, j, k, C;  // iterators
+	real h; // depth
 
 	// make sure there are enough GPU devices in the given range
 	if(nsubdom > dev_end - dev_start + 1) {
@@ -344,6 +354,8 @@ int Eulerian_init(void)
 	concen = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	bubmas = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
+	cpumem += Dom.Gcc.s3b * sizeof(real);
+	bubden = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	
 	// initialize UNIFORM number density field
@@ -409,6 +421,124 @@ int Eulerian_init(void)
 		w_b[k] = 0.;
 	}
 	
+	// initialize cell-centered and face-centered bubble density field, 
+	// need to define the gravity direction, note that POSITIVE direction have  
+	// to be the water surface and NEGATIVE direction have to be the bottom.
+	if(gravity_direction == GRAVITY_X) {
+		
+		bubden_face = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
+		cpumem += Dom.Gfx.s3b * sizeof(real);
+		
+		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
+			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
+				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb - 1; i++) {
+					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+					h = ((real)(Dom.Gcc.ieb - i) - 1.5) * Dom.dx;
+					bubden[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
+			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
+					i = Dom.Gcc.ieb - 1;
+					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+					bubden[C] = rho_atm;
+			}
+		}
+		for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
+			for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
+				for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb - 1; i++) {
+					C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
+					h = ((real)(Dom.Gfx.ieb - i) - 2.0) * Dom.dx;
+					bubden_face[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
+			for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
+					i = Dom.Gfx.ieb - 1;
+					C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
+					bubden_face[C] = rho_atm;
+			}
+		}
+	}
+	else if(gravity_direction == GRAVITY_Y) {
+		
+		bubden_face = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
+		cpumem += Dom.Gfy.s3b * sizeof(real);
+		
+		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
+			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb - 1; j++) {
+				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
+					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+					h = ((real)(Dom.Gcc.jeb - j) - 1.5) * Dom.dy;
+					bubden[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
+			for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
+				j = Dom.Gcc.jeb - 1;
+				C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+				bubden[C] = rho_atm;
+			}
+		}
+		for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
+			for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb - 1; j++) {
+				for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
+					C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
+					h = ((real)(Dom.Gfy.ieb - i) - 2.0) * Dom.dy;
+					bubden_face[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
+			for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
+				j = Dom.Gfy.jeb - 1;
+				C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
+				bubden_face[C] = rho_atm;
+			}
+		}
+	}
+	else if(gravity_direction == GRAVITY_Z) {
+		
+		bubden_face = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
+		cpumem += Dom.Gfz.s3b * sizeof(real);
+		
+		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb - 1; k++) {
+			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
+				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
+					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+					h = ((real)(Dom.Gcc.keb - k) - 1.5) * Dom.dz;
+					bubden[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
+			for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
+				k = Dom.Gcc.keb - 1;
+				C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+				bubden[C] = rho_atm;
+			}
+		}
+		for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb - 1; k++) {
+			for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
+				for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
+					C = i + j * Dom.Gfz.s1b + k * Dom.Gfz.s2b;
+					h = ((real)(Dom.Gfz.keb - k) - 2.0) * Dom.dz;
+					bubden_face[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
+				}
+			}
+		}
+		for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
+			for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
+				k = Dom.Gfz.keb - 1;
+				C = i + j * Dom.Gfz.s1b + k * Dom.Gfz.s2b;
+				bubden_face[C] = rho_atm;
+			}
+		}
+	}
+	
 	// initialize some values
 	// totalnumden is the sum of number density inside the domain(without ghost cell)
 	totalnumden = 0;
@@ -434,6 +564,8 @@ void Eulerian_show_config()
 	printf("%f\n", pressure_atm);
 	printf("grav_acc ");
 	printf("%f\n", grav_acc);
+	printf("gravity_direction ");
+	printf("%d\n", gravity_direction);
 	printf("\n");
 	
 	printf("DISSOLUTION PARAMETERS\n");
@@ -597,4 +729,314 @@ void Eulerian_show_config()
 	printf("bubble density at bottom: %f\n", rho_bot);
 	printf("terminal velocity: %f\n", u_ter_init);
 	printf("########################################################################\n");
+}
+
+void cgns_grid_Eulerian(void)
+{
+  // create the file
+  char fname[FILE_NAME_SIZE];
+  sprintf(fname, "%s/output/%s", ROOT_DIR, "grid.cgns");
+  int fn;
+  int bn;
+  int zn;
+  int gn;
+  int cn;
+  cg_open(fname, CG_MODE_WRITE, &fn);
+  cg_base_write(fn, "Base", 3, 3, &bn);
+  cgsize_t size[9];
+  size[0] = Dom.xn+1; // cells -> vertices
+  size[1] = Dom.yn+1;
+  size[2] = Dom.zn+1;
+  size[3] = Dom.xn;
+  size[4] = Dom.yn;
+  size[5] = Dom.zn;
+  size[6] = 0;
+  size[7] = 0;
+  size[8] = 0;
+  //############################################################################
+  cg_biter_write(fn, bn, "BaseIterativeData", 1);
+  cg_zone_write(fn, bn, "Zone0", size, Structured, &zn);
+  cg_ziter_write(fn, bn, zn, "ZoneIterativeData");
+  //############################################################################
+  cg_grid_write(fn, bn, zn, "GridCoordinates", &gn);
+
+  real *x = malloc((Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real));
+  // cpumem = (Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real);
+  real *y = malloc((Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real));
+  // cpumem = (Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real);
+  real *z = malloc((Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real));
+  // cpumem = (Dom.xn+1)*(Dom.yn+1)*(Dom.zn+1) * sizeof(real);
+  for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke+1; k++) {
+    for(int j = Dom.Gcc.js; j < Dom.Gcc.je+1; j++) {
+      for(int i = Dom.Gcc.is; i < Dom.Gcc.ie+1; i++) {
+        int C = (i-1) + (j-1)*(Dom.xn+1) + (k-1)*(Dom.xn+1)*(Dom.yn+1);
+        x[C] = Dom.xs + (i-1)*Dom.dx;
+        y[C] = Dom.ys + (j-1)*Dom.dy;
+        z[C] = Dom.zs + (k-1)*Dom.dz;
+      }
+    }
+  }
+
+  cg_coord_write(fn, bn, zn, RealDouble, "CoordinateX", x, &cn);
+  cg_coord_write(fn, bn, zn, RealDouble, "CoordinateY", y, &cn);
+  cg_coord_write(fn, bn, zn, RealDouble, "CoordinateZ", z, &cn);
+
+  free(x);
+  free(y);
+  free(z);
+
+  cg_close(fn);
+  
+  
+  
+  // create solution name recorder file
+  char path[FILE_NAME_SIZE];
+  sprintf(path, "%s/record/%s", ROOT_DIR, "solname.rec");
+  FILE *rec = fopen(path, "w");
+  if(rec == NULL) {
+    fprintf(stderr, "Could not open file %s\n", "solname.rec");
+    exit(EXIT_FAILURE);
+  }
+  fprintf(rec, "Solution names:\n");
+  fclose(rec);
+}
+
+void cgns_flow_field_Eulerian(real dtout)
+{
+	// create the solution file
+	char fname[FILE_NAME_SIZE];
+	char fname2[FILE_NAME_SIZE];
+	char fnameall[FILE_NAME_SIZE];
+	char fnameall2[FILE_NAME_SIZE];
+	char gname[FILE_NAME_SIZE];
+	char gnameall[FILE_NAME_SIZE];
+	real tout = ttime; //  = rec_flow_field_stepnum_out * dtout;
+	char format[CHAR_BUF_SIZE];
+	char snodename[CHAR_BUF_SIZE];
+	char snodenameall[CHAR_BUF_SIZE];
+	int sigfigs = ceil(log10(1. / dtout));
+	if(sigfigs < 1) sigfigs = 1;
+
+	sprintf(format, "%%.%df", sigfigs);
+
+	sprintf(fname2, "flow-%s.cgns", format);
+	sprintf(fnameall2, "%s/output/flow-%s.cgns", ROOT_DIR, format);
+	sprintf(snodename, "Solution-");
+	sprintf(snodenameall, "/Base/Zone0/Solution-");
+	sprintf(snodename, "%s%s", snodename, format);
+	sprintf(snodenameall, "%s%s", snodenameall, format);
+	sprintf(fname, fname2, tout);
+	sprintf(fnameall, fnameall2, tout);
+	sprintf(snodename, snodename, tout);
+	sprintf(snodenameall, snodenameall, tout);
+
+	// grid file name
+	sprintf(gname, "grid.cgns");
+	// grid file name and path
+	sprintf(gnameall, "%s/output/%s", ROOT_DIR, "grid.cgns");
+	
+	int fn;
+	// in our case we have only one base and one zone, need to check in future
+	int bn = 1;
+	int zn = 1;
+	int sn;
+	int fnpress;
+	int fnu;
+	int fnv;
+	int fnw;
+	int fnnumden;
+	int fnbubmas;
+	int fnconcen;
+
+	// check that grid.cgns exists
+	if(cg_open(gnameall, CG_MODE_MODIFY, &fn) != 0) {
+		fprintf(stderr, "CGNS flow field write failure: no grid.cgns\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	cg_sol_write(fn, bn, zn, snodename, CellCenter, &sn);
+	
+	//==========================================================================
+	real *pout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
+				pout[C] = p[CC];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "Pressure", pout, &fnpress);
+	
+	real *uout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gfx.ks; k < Dom.Gfx.ke; k++) {
+		for(int j = Dom.Gfx.js; j < Dom.Gfx.je; j++) {
+			for(int i = Dom.Gfx.is; i < Dom.Gfx.ie-1; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC0 = (i-1) + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+				int CC1 = i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+				int CC2 = (i+1) + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+				int CC3 = (i+2) + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+				uout[C] = -0.0625*u[CC0] + 0.5625*u[CC1] + 0.5625*u[CC2] - 0.0625*u[CC3];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "VelocityX", uout, &fnu);
+	
+	real *vout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gfy.ks; k < Dom.Gfy.ke; k++) {
+		for(int j = Dom.Gfy.js; j < Dom.Gfy.je-1; j++) {
+			for(int i = Dom.Gfy.is; i < Dom.Gfy.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC0 = i + (j-1)*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+				int CC1 = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+				int CC2 = i + (j+1)*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+				int CC3 = i + (j+2)*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+				vout[C] = -0.0625*v[CC0] + 0.5625*v[CC1] + 0.5625*v[CC2] - 0.0625*v[CC3];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "VelocityY", vout, &fnv);
+	
+	real *wout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gfz.ks; k < Dom.Gfz.ke-1; k++) {
+		for(int j = Dom.Gfz.js; j < Dom.Gfz.je; j++) {
+			for(int i = Dom.Gfz.is; i < Dom.Gfz.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC0 = i + j*Dom.Gfz.s1b + (k-1)*Dom.Gfz.s2b;
+				int CC1 = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
+				int CC2 = i + j*Dom.Gfz.s1b + (k+1)*Dom.Gfz.s2b;
+				int CC3 = i + j*Dom.Gfz.s1b + (k+2)*Dom.Gfz.s2b;
+				wout[C] = -0.0625*w[CC0] + 0.5625*w[CC1] + 0.5625*w[CC2] - 0.0625*w[CC3];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "VelocityZ", wout, &fnw);
+	
+	real *numdenout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
+				numdenout[C] = numden[CC];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "NumberDensity", numdenout, &fnnumden);
+	
+	real *bubmasout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
+				bubmasout[C] = bubmas[CC];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "BubbleMass", bubmasout, &fnbubmas);
+	
+	real *concenout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
+				concenout[C] = concen[CC];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "Concentration", concenout, &fnconcen);
+	//==========================================================================
+	
+	free(pout);
+	free(uout);
+	free(vout);
+	free(wout);
+	free(numdenout);
+	free(bubmasout);
+	free(concenout);
+	
+	cg_close(fn);
+	
+	// create solution name recorder file
+	char path[FILE_NAME_SIZE];
+	sprintf(path, "%s/record/%s", ROOT_DIR, "solname.rec");
+	FILE *rec = fopen(path, "a");
+	fprintf(rec, "%s\n", snodename);
+	fprintf(rec, "%lf\n", ttime);
+	fclose(rec);
+}
+
+void cgns_finish_Eulerian(void)
+{
+	int i;
+	int N;
+	char buf[CHAR_BUF_SIZE];
+	char gnameall[FILE_NAME_SIZE];
+	int fn;
+	// in our case we have only one base and one zone, need to check in future
+	int bn = 1;
+	int zn = 1;
+	cgsize_t tsize[1];
+	cgsize_t solsize[2];
+	
+	// grid file name and path
+	sprintf(gnameall, "%s/output/%s", ROOT_DIR, "grid.cgns");
+	cg_open(gnameall, CG_MODE_MODIFY, &fn);
+	
+	// get the number of solutions
+	cg_nsols(fn, bn, zn, &N);
+	
+	cgns_tseries = malloc(N * sizeof(real));
+	
+	const char *cgns_solname[N];
+	
+	int fret = 0;
+	fret = fret; // prevent compiler warning
+	
+	// open soluton name record file for reading
+	char fname[FILE_NAME_SIZE];
+	sprintf(fname, "%s/record/solname.rec", ROOT_DIR);
+	FILE *infile = fopen(fname, "r");
+	if(infile == NULL) {
+		fprintf(stderr, "Could not open file %s\n", fname);
+		exit(EXIT_FAILURE);
+	}
+	
+	fret = fscanf(infile, "Solution names:\n");
+	for(i = 0; i < N; i++) {
+		fret = fscanf(infile, "%s\n", buf);
+		cgns_solname[i] = buf;
+		fret = fscanf(infile, "%lf\n", &cgns_tseries[i]);
+		printf("+++%s, %lf\n", cgns_solname[i], cgns_tseries[i]);
+	}
+	
+	fclose(infile);
+	
+	tsize[0] = N;
+	cg_biter_write(fn, bn, "BaseIterativeData", N);
+	cg_goto(fn, bn, "BaseIterativeData_t", 1, "end");
+	cg_array_write("TimeValues", RealDouble, 1, tsize, cgns_tseries);
+	cg_goto(fn, bn, "Zone_t", zn, "ZoneIterativeData_t", 1, "end");
+	solsize[0] = 32;
+	solsize[1] = N;
+	cgns_solname[0] = "Solution-0.0000";
+	cgns_solname[1] = "Solution-0.0022";
+	cgns_solname[2] = "Solution-0.0044";
+	cg_array_write("FlowSolutionPointers", Character, 2, solsize, cgns_solname);
+	
+	cg_simulation_type_write(fn, bn, TimeAccurate);
+	
+	free(cgns_tseries);
+	cg_close(fn);
 }

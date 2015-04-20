@@ -26,6 +26,7 @@ void cuda_Eulerian_push(void)
 		//real *uu_p = (real*) malloc(dom[dev].Gfx.s3b * sizeof(real));
 		//real *vv_p = (real*) malloc(dom[dev].Gfy.s3b * sizeof(real));
 		//real *ww_p = (real*) malloc(dom[dev].Gfz.s3b * sizeof(real));
+		real *bden = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		
 		// number density
 		for(k = dom[dev].Gcc.ksb; k < dom[dev].Gcc.keb; k++) {
@@ -107,6 +108,80 @@ void cuda_Eulerian_push(void)
 				}
 			}
 		}
+		// bubble density
+		for(k = dom[dev].Gcc.ksb; k < dom[dev].Gcc.keb; k++) {
+			for(j = dom[dev].Gcc.jsb; j < dom[dev].Gcc.jeb; j++) {
+				for(i = dom[dev].Gcc.isb; i < dom[dev].Gcc.ieb; i++) {
+					ii = i - dom[dev].Gcc.isb;
+					jj = j - dom[dev].Gcc.jsb;
+					kk = k - dom[dev].Gcc.ksb;
+					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+					CC = ii + jj * dom[dev].Gcc.s1b + kk * dom[dev].Gcc.s2b;
+					bden[CC] = bubden[C];
+				}
+			}
+		}
+		
+		// face-centered bubble density
+		if(gravity_direction == GRAVITY_X) {
+			
+			real *bdenf = (real*) malloc(dom[dev].Gfx.s3b * sizeof(real));
+			
+			for(k = dom[dev].Gfx.ksb; k < dom[dev].Gfx.keb; k++) {
+				for(j = dom[dev].Gfx.jsb; j < dom[dev].Gfx.jeb; j++) {
+					for(i = dom[dev].Gfx.isb; i < dom[dev].Gfx.ieb; i++) {
+						ii = i - dom[dev].Gfx.isb;
+						jj = j - dom[dev].Gfx.jsb;
+						kk = k - dom[dev].Gfx.ksb;
+						C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
+						CC = ii + jj * dom[dev].Gfx.s1b + kk * dom[dev].Gfx.s2b;
+						bdenf[CC] = bubden_face[C];
+					}
+				}
+			}
+			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfx.s3b, cudaMemcpyHostToDevice));
+			free(bdenf);
+		}
+		else if(gravity_direction == GRAVITY_Y) {
+			
+			real *bdenf = (real*) malloc(dom[dev].Gfy.s3b * sizeof(real));
+			
+			for(k = dom[dev].Gfy.ksb; k < dom[dev].Gfy.keb; k++) {
+				for(j = dom[dev].Gfy.jsb; j < dom[dev].Gfy.jeb; j++) {
+					for(i = dom[dev].Gfy.isb; i < dom[dev].Gfy.ieb; i++) {
+						ii = i - dom[dev].Gfy.isb;
+						jj = j - dom[dev].Gfy.jsb;
+						kk = k - dom[dev].Gfy.ksb;
+						C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
+						CC = ii + jj * dom[dev].Gfy.s1b + kk * dom[dev].Gfy.s2b;
+						bdenf[CC] = bubden_face[C];
+					}
+				}
+			}
+			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfy.s3b, cudaMemcpyHostToDevice));
+			free(bdenf);
+		}
+		else if(gravity_direction == GRAVITY_Z) {
+			
+			real *bdenf = (real*) malloc(dom[dev].Gfz.s3b * sizeof(real));
+			
+			for(k = dom[dev].Gfz.ksb; k < dom[dev].Gfz.keb; k++) {
+				for(j = dom[dev].Gfz.jsb; j < dom[dev].Gfz.jeb; j++) {
+					for(i = dom[dev].Gfz.isb; i < dom[dev].Gfz.ieb; i++) {
+						ii = i - dom[dev].Gfz.isb;
+						jj = j - dom[dev].Gfz.jsb;
+						kk = k - dom[dev].Gfz.ksb;
+						C = i + j * Dom.Gfz.s1b + k * Dom.Gfz.s2b;
+						CC = ii + jj * dom[dev].Gfz.s1b + kk * dom[dev].Gfz.s2b;
+						bdenf[CC] = bubden_face[C];
+					}
+				}
+			}
+			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyHostToDevice));
+			free(bdenf);
+		}
+		
+		
 		
 		// copy from host to device
 		checkCudaErrors(cudaMemcpy(_numden[dev], nn, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
@@ -115,11 +190,13 @@ void cuda_Eulerian_push(void)
 		//checkCudaErrors(cudaMemcpy(_u_p[dev], uu_p, sizeof(real) * dom[dev].Gfx.s3b, cudaMemcpyHostToDevice));
 		//checkCudaErrors(cudaMemcpy(_v_p[dev], vv_p, sizeof(real) * dom[dev].Gfy.s3b, cudaMemcpyHostToDevice));
 		//checkCudaErrors(cudaMemcpy(_w_p[dev], ww_p, sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(_bubden[dev], bden, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
 		
 		// free host subdomain working arrays
 		free(nn);
 		free(bubm);
 		free(cc);
+		free(bden);
 		//free(uu_p);
 		//free(vv_p);
 		//free(ww_p);
@@ -142,17 +219,13 @@ void cuda_Eulerian_pull(void)
 		real *nn = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		real *bubm = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		real *cc = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
-		//real *uu_p = (real*) malloc(dom[dev].Gfx.s3b * sizeof(real));
-		//real *vv_p = (real*) malloc(dom[dev].Gfy.s3b * sizeof(real));
-		//real *ww_p = (real*) malloc(dom[dev].Gfz.s3b * sizeof(real));
+		real *u_ter = (real*) malloc(dom[dev].Gfz.s3b * sizeof(real));
 		
 		// copy from device to host
 		checkCudaErrors(cudaMemcpy(nn, _numden[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
 		checkCudaErrors(cudaMemcpy(bubm, _bubmas[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
 		checkCudaErrors(cudaMemcpy(cc, _concen[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
-		//checkCudaErrors(cudaMemcpy(uu_p, _u_p[dev], sizeof(real) * dom[dev].Gfx.s3b, cudaMemcpyDeviceToHost));
-		//checkCudaErrors(cudaMemcpy(vv_p, _v_p[dev], sizeof(real) * dom[dev].Gfy.s3b, cudaMemcpyDeviceToHost));
-		//checkCudaErrors(cudaMemcpy(ww_p, _w_p[dev], sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaMemcpy(u_ter, _w_b[dev], sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyDeviceToHost));
 		
 		// fill in apropriate subdomain (copy back ghost cells)
 		// numden
@@ -168,34 +241,7 @@ void cuda_Eulerian_pull(void)
 				}
 			}
 		}
-		/*
-		// u
-		for(k = dom[dev].Gfx.ksb; k < dom[dev].Gfx.keb; k++) {
-			for(j = dom[dev].Gfx.jsb; j < dom[dev].Gfx.jeb; j++) {
-				for(i = dom[dev].Gfx.isb; i < dom[dev].Gfx.ieb; i++) {
-					ii = i - dom[dev].Gfx.isb;
-					jj = j - dom[dev].Gfx.jsb;
-					kk = k - dom[dev].Gfx.ksb;
-					C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
-					CC = ii + jj * dom[dev].Gfx.s1b + kk * dom[dev].Gfx.s2b;
-					u_p[C] = uu_p[CC];
-				}
-			}
-		}
-		// v
-		for(k = dom[dev].Gfy.ksb; k < dom[dev].Gfy.keb; k++) {
-			for(j = dom[dev].Gfy.jsb; j < dom[dev].Gfy.jeb; j++) {
-				for(i = dom[dev].Gfy.isb; i < dom[dev].Gfy.ieb; i++) {
-					ii = i - dom[dev].Gfy.isb;
-					jj = j - dom[dev].Gfy.jsb;
-					kk = k - dom[dev].Gfy.ksb;
-					C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
-					CC = ii + jj * dom[dev].Gfy.s1b + kk * dom[dev].Gfy.s2b;
-					v_p[C] = vv_p[CC];
-				}
-			}
-		}
-		// w
+		// w_b
 		for(k = dom[dev].Gfz.ksb; k < dom[dev].Gfz.keb; k++) {
 			for(j = dom[dev].Gfz.jsb; j < dom[dev].Gfz.jeb; j++) {
 				for(i = dom[dev].Gfz.isb; i < dom[dev].Gfz.ieb; i++) {
@@ -204,11 +250,10 @@ void cuda_Eulerian_pull(void)
 					kk = k - dom[dev].Gfz.ksb;
 					C = i + j * Dom.Gfz.s1b + k * Dom.Gfz.s2b;
 					CC = ii + jj * dom[dev].Gfz.s1b + kk * dom[dev].Gfz.s2b;
-					w_p[C] = ww_p[CC];
+					w_b[C] = u_ter[CC];
 				}
 			}
 		}
-		*/
 		// bubmas
 		for(k = dom[dev].Gcc.ksb; k < dom[dev].Gcc.keb; k++) {
 			for(j = dom[dev].Gcc.jsb; j < dom[dev].Gcc.jeb; j++) {
@@ -240,9 +285,7 @@ void cuda_Eulerian_pull(void)
 		free(nn);
 		free(bubm);
 		free(cc);
-		//free(uu_p);
-		//free(vv_p);
-		//free(ww_p);
+		free(u_ter);
 	}
 }
 
@@ -269,6 +312,8 @@ void cuda_Eulerian_free(void)
 		checkCudaErrors(cudaFree(_nextconcen[dev]));
 		checkCudaErrors(cudaFree(_velmag[dev]));
 		checkCudaErrors(cudaFree(_mdot[dev]));
+		checkCudaErrors(cudaFree(_bubden[dev]));
+		checkCudaErrors(cudaFree(_bubden_face[dev]));
 	}
 	
 	// free device memory on host
@@ -286,6 +331,8 @@ void cuda_Eulerian_free(void)
 	free(_nextconcen);
 	free(_velmag);
 	free(_mdot);
+	free(_bubden);
+	free(_bubden_face);
 }
 
 extern "C"
@@ -560,9 +607,15 @@ void cuda_compute_particle_velz(void)
 		dim3 numBlocks_z(blocks_x, blocks_y);
 		
 		// since bubble diameter is a field, here combine all the values in terminal velocity except bubble diameter
-		real cons = 1.0 / 18.0 * (rho_f - bubble_density) / mu * grav_acc;
+		real cons = grav_acc / 18.0 / mu;
 		
-		kernel_numberdensity_particle_velz<<<numBlocks_z, dimBlocks_z>>>(cons, _w_b[dev], _w[dev], _bubdiafz[dev], _dom[dev]);
+		kernel_numberdensity_particle_velz<<<numBlocks_z, dimBlocks_z>>>(cons,
+		                                                                 _w_b[dev],
+		                                                                 _w[dev],
+		                                                                 _bubdiafz[dev],
+		                                                                 _dom[dev],
+		                                                                 _bubden_face[dev],
+		                                                                 rho_f);
 	}
 }
 
@@ -603,6 +656,10 @@ void cuda_Eulerian_malloc(void)
 	_velmag = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
 	_mdot = (real**) malloc(nsubdom * sizeof(real*));
+	cpumem += nsubdom * sizeof(real*);
+	_bubden = (real**) malloc(nsubdom * sizeof(real*));
+	cpumem += nsubdom * sizeof(real*);
+	_bubden_face = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
 	
 	// allocate device memory on device
@@ -652,6 +709,18 @@ void cuda_Eulerian_malloc(void)
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		checkCudaErrors(cudaMalloc((void**) &(_mdot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
+		checkCudaErrors(cudaMalloc((void**) &(_bubden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		gpumem += dom[dev].Gcc.s3b * sizeof(real);
+		if(gravity_direction == GRAVITY_X) {
+			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfx.s3b));
+			gpumem += dom[dev].Gfx.s3b * sizeof(real);
+		} else if(gravity_direction == GRAVITY_Y) {
+			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfy.s3b));
+			gpumem += dom[dev].Gfy.s3b * sizeof(real);
+		} else if(gravity_direction == GRAVITY_Z) {
+			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfz.s3b));
+			gpumem += dom[dev].Gfz.s3b * sizeof(real);
+		}
 	}
 }
 
@@ -926,13 +995,15 @@ void cuda_compute_coupling_forcing(void)
 		forcing_reset_z<<<numBlocks_z, dimBlocks_z>>>(_f_z[dev], _dom[dev]);
 		
 		// now add in the forcing
-		real forcing_scale = 1.0/ 6.0 * PI * (rho_f - bubble_density) * grav_acc / rho_f;
+		real forcing_scale = 1.0/ 6.0 * PI * grav_acc / rho_f;
 		
 		kernel_forcing_add_z_field_bubble<<<numBlocks_z, dimBlocks_z>>>(forcing_scale,
 		                                                                _f_z_coupling_numden[dev],
 		                                                                _bubdiafz[dev],
 		                                                                _f_z[dev],
-		                                                                _dom[dev]);
+		                                                                _dom[dev],
+		                                                                _bubden_face[dev],
+		                                                                rho_f);
 	}
 }
 
@@ -1332,48 +1403,48 @@ void cuda_compute_bubble_diameter(void)
 		if(dom[dev].W == -1) {
 			switch(numdenBC.nW) {
 				case PERIODIC:
-				BC_w_W_P<<<numBlocks_x, dimBlocks_x>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_W_P<<<numBlocks_x, dimBlocks_x>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 			}
 		}
 		if(dom[dev].E == -1) {
 			switch(numdenBC.nE) {
 				case PERIODIC:
-				BC_w_E_P<<<numBlocks_x, dimBlocks_x>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_E_P<<<numBlocks_x, dimBlocks_x>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 			}
 		}
 		if(dom[dev].S == -1) {
 			switch(numdenBC.nS) {
 				case PERIODIC:
-				BC_w_S_P<<<numBlocks_y, dimBlocks_y>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_S_P<<<numBlocks_y, dimBlocks_y>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 			}
 		}
 		if(dom[dev].N == -1) {
 			switch(numdenBC.nN) {
 				case PERIODIC:
-				BC_w_N_P<<<numBlocks_y, dimBlocks_y>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_N_P<<<numBlocks_y, dimBlocks_y>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 			}
 		}
 		if(dom[dev].B == -1) {
 			switch(numdenBC.nB) {
 				case PERIODIC:
-				BC_w_B_P<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_B_P<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 				case DIRICHLET:
-				BC_w_B_D<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev], numdenBC.nBD);
+					BC_w_B_D<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev], numdenBC.nBD);
 				break;
 				case NEUMANN:
-				BC_w_B_N<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
-				                                       _dom[dev]);
+					BC_w_B_N<<<numBlocks_z, dimBlocks_z>>>(_f_z_coupling_numden[dev],
+				                                           _dom[dev]);
 				break;
 			}
 		}
@@ -1554,17 +1625,19 @@ void cuda_compute_mdot(void)
 		dim3 dimBlocks(threads_y, threads_z);
 		dim3 numBlocks(blocks_y, blocks_z);
 		
-		real cons = abs(1.0 / 18.0 * (rho_f - bubble_density) / mu * grav_acc);
+		real cons = 1.0 / 18.0 / mu * grav_acc;
 		
 		kernel_compute_mdot<<<numBlocks, dimBlocks>>>(_dom[dev],
                                                       _numden[dev],
                                                       _concen[dev],
                                                       _bubdia[dev],
+                                                      _bubden[dev],
                                                       _mdot[dev],
                                                       cons,
                                                       concen_diss,
                                                       concen_diff,
-                                                      nu);
+                                                      nu,
+                                                      rho_f);
 	}
 }
 

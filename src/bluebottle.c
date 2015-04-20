@@ -164,9 +164,11 @@ real Ki;
 real Kd;
 //##############################################################################
 // used by Eulerian branch
+
+real *cgns_tseries;
+char **cgns_solname;
 // number density equation
 real bubble_radius;
-real bubble_density;
 int bubble_init_cond;
 real bubble_init_cond_uniform_m;
 int bubble_init_cond_random_min;
@@ -203,6 +205,11 @@ real **_bubdiafz;
 int bubmas_init_cond;
 numdenBC_struct bubmasBC;
 real bubmas_init_cond_uniform_m;
+int gravity_direction;
+real *bubden;
+real *bubden_face;
+real **_bubden;
+real **_bubden_face;
 
 real pressure_atm;
 real rho_atm;
@@ -490,6 +497,14 @@ int main(int argc, char *argv[]) {
         }
       }
       
+      
+      //########################################################################
+      // print config info
+      Eulerian_show_config();
+      //domain_show_config();
+      //########################################################################
+      
+      
       /*
       #ifdef DEBUG
         // write config to screen
@@ -578,8 +593,8 @@ int main(int argc, char *argv[]) {
           if(rec_flow_field_dt > 0) {
             printf("Writing flow field file t = %e...", ttime);
             fflush(stdout);
-            cgns_grid();
-            cgns_flow_field(rec_flow_field_dt);
+            cgns_grid_Eulerian();
+            cgns_flow_field_Eulerian(rec_flow_field_dt);
             rec_flow_field_stepnum_out++;
             printf("done.               \n");
             fflush(stdout);
@@ -605,12 +620,7 @@ int main(int argc, char *argv[]) {
 
         #endif
         }
-        
-        //######################################################################
-        // print config info
-        Eulerian_show_config();
-        //domain_show_config();
-        //######################################################################
+
         
         /******************************************************************/
         /** Begin the main timestepping loop in the experimental domain. **/
@@ -756,17 +766,20 @@ int main(int argc, char *argv[]) {
           } else {
             return EXIT_FAILURE;
           }
-
+          
+          //####################################################################
+          // cgns output
           if(rec_flow_field_dt > 0) {
             if(rec_flow_field_ttime_out >= rec_flow_field_dt) {
               // pull back data and write fields
               cuda_dom_pull();
+              cuda_Eulerian_pull();
               #ifndef BATCHRUN
                 printf("  Writing flow field file t = %e...                  \r",
                   ttime);
                 fflush(stdout);
               #endif
-              cgns_flow_field(rec_flow_field_dt);
+              cgns_flow_field_Eulerian(rec_flow_field_dt);
               printf("  Writing flow field file t = %e...done.\n", ttime);
               fflush(stdout);
               rec_flow_field_ttime_out = rec_flow_field_ttime_out
@@ -774,6 +787,8 @@ int main(int argc, char *argv[]) {
               rec_flow_field_stepnum_out++;
             }
           }
+          //####################################################################
+          
           if(rec_paraview_dt > 0) {
             if(rec_paraview_ttime_out >= rec_paraview_dt) {
               // pull back data and write fields
@@ -851,6 +866,11 @@ int main(int argc, char *argv[]) {
         /******************************************************************/
         /**The end of main timestepping loop in the experimental domain. **/
         /******************************************************************/
+        
+        
+        cgns_finish_Eulerian();
+        
+        
         
         
         if(rec_restart_dt > 0 && ttime >= duration && !restart_stop) {

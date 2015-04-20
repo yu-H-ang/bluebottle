@@ -18,13 +18,18 @@ void cuda_compute_bubble_diameter(void);
 void cuda_compute_particle_velz(void);
 void cuda_compute_coupling_forcing(void);
 void cuda_compute_mdot(void);
+
+void cgns_flow_field_Eulerian(real dtout);
+void cgns_grid_Eulerian(void);
+void cgns_finish_Eulerian(void);
+extern real *cgns_tseries;
+extern char **cgns_solname;
 //======================================================================
 // number density equation
 
 #define UNIFORM 0
 #define RANDOM 271828
 
-extern real bubble_density;
 extern real bubble_radius;
 extern int bubble_init_cond;
 extern real bubble_init_cond_uniform_m;
@@ -73,6 +78,10 @@ void cuda_concentration_march(void);
 //======================================================================
 // bubble mass equation
 
+#define GRAVITY_X 1
+#define GRAVITY_Y 2
+#define GRAVITY_Z 3
+
 extern real *bubmas;
 extern real **_bubmas;
 extern real **_nextbubmas;
@@ -81,6 +90,11 @@ extern real **_bubdiafz;
 extern int bubmas_init_cond;
 extern numdenBC_struct bubmasBC;
 extern real bubmas_init_cond_uniform_m;
+extern int gravity_direction;
+extern real *bubden;
+extern real *bubden_face;
+extern real **_bubden;
+extern real **_bubden_face;
 
 extern real pressure_atm;
 extern real rho_atm;

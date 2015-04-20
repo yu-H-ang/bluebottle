@@ -375,17 +375,19 @@ void cgns_flow_field(real dtout)
   char snodenameall[CHAR_BUF_SIZE];
   int sigfigs = ceil(log10(1. / dtout));
   if(sigfigs < 1) sigfigs = 1;
-  sprintf(format, "%%.%df", sigfigs);
-  sprintf(fname2, "flow-%s.cgns", format);
-  sprintf(fnameall2, "%s/output/flow-%s.cgns", ROOT_DIR, format);
-  sprintf(snodename, "Solution-");
-  sprintf(snodenameall, "/Base/Zone0/Solution-");
-  sprintf(snodename, "%s%s", snodename, format);
-  sprintf(snodenameall, "%s%s", snodenameall, format);
-  sprintf(fname, fname2, tout);
-  sprintf(fnameall, fnameall2, tout);
-  sprintf(snodename, snodename, tout);
-  sprintf(snodenameall, snodenameall, tout);
+  
+  sprintf(format, "%%.%df", sigfigs);                              //printf("1==%s\n", format);
+  sprintf(fname2, "flow-%s.cgns", format);                         //printf("2==%s\n", fname2);
+  sprintf(fnameall2, "%s/output/flow-%s.cgns", ROOT_DIR, format);  //printf("3==%s\n", fnameall2);
+  sprintf(snodename, "Solution-");                                 //printf("4==%s\n", snodename);
+  sprintf(snodenameall, "/Base/Zone0/Solution-");                  //printf("5==%s\n", snodenameall);
+  sprintf(snodename, "%s%s", snodename, format);                   //printf("6==%s\n", snodename);
+  sprintf(snodenameall, "%s%s", snodenameall, format);             //printf("7==%s\n", snodenameall);
+  sprintf(fname, fname2, tout);                                    //printf("8==%s\n", fname);
+  sprintf(fnameall, fnameall2, tout);                              //printf("9==%s\n", fnameall);
+  sprintf(snodename, snodename, tout);                             //printf("10==%s\n", snodename);
+  sprintf(snodenameall, snodenameall, tout);                       //printf("11==%s\n", snodenameall);
+  
   sprintf(gname, "grid.cgns");
   sprintf(gnameall, "%s/output/%s", ROOT_DIR, "grid.cgns");
   int fn;
@@ -512,83 +514,84 @@ void cgns_flow_field(real dtout)
   free(vout);
   free(wout);
   free(phaseout);
+/*
+  // now link this timestep into time series
+  // create the time series file if it doesn't exist
+  char sname[FILE_NAME_SIZE];
+  sprintf(sname, "%s/output/flow.cgns", ROOT_DIR);
+  int fns;
+  int bns;
+  int depth;
+  char *label = malloc(CHAR_BUF_SIZE * sizeof(real));
+  cpumem += CHAR_BUF_SIZE * sizeof(real);
+  char *bitername = malloc(CHAR_BUF_SIZE * sizeof(real));
+  cpumem += CHAR_BUF_SIZE * sizeof(real);
+  int index;
+  int zns;
+  real *tseries = malloc(sizeof(real));
+  cpumem += sizeof(real);
+  tseries[0] = 0;
+  cgsize_t tsize[1];
+  tsize[0] = 1;
 
-//  // now link this timestep into time series
-//  // create the time series file if it doesn't exist
-//  char sname[FILE_NAME_SIZE];
-//  sprintf(sname, "%s/output/flow.cgns", ROOT_DIR);
-//  int fns;
-//  int bns;
-//  int depth;
-//  char *label = malloc(CHAR_BUF_SIZE * sizeof(real));
-//  cpumem += CHAR_BUF_SIZE * sizeof(real);
-//  char *bitername = malloc(CHAR_BUF_SIZE * sizeof(real));
-//  cpumem += CHAR_BUF_SIZE * sizeof(real);
-//  int index;
-//  int zns;
-//  real *tseries = malloc(sizeof(real));
-//  cpumem += sizeof(real);
-//  tseries[0] = 0;
-//  cgsize_t tsize[1];
-//  tsize[0] = 1;
-//
-//  if(cg_is_cgns(sname, &fns) != 0) {
-//    // if it does not exist, create it
-//    cg_open(sname, CG_MODE_WRITE, &fns);
-//    cg_base_write(fn, "Base", 3, 3, &bns);
-//    //cgsize_t size[9];
-//    size[0] = Dom.xn+1; // cells -> vertices
-//    size[1] = Dom.yn+1;
-//    size[2] = Dom.zn+1;
-//    size[3] = Dom.xn;
-//    size[4] = Dom.yn;
-//    size[5] = Dom.zn;
-//    size[6] = 0;
-//    size[7] = 0;
-//    size[8] = 0;
-//    cg_zone_write(fns, bns, "Zone0", size, Structured, &zns);
-//    cg_goto(fns, bns, "Zone_t", zns, "end");
-//    cg_link_write("GridCoordinates", gname, "Base/Zone0/GridCoordinates");
-//    char solname2[CHAR_BUF_SIZE];
-//    sprintf(solname2, "Solution-%s", format);
-//    sprintf(solname2, solname2, tout);
-//    cg_link_write(solname2, fname, "Base/Zone0/Solution");
-//    cg_biter_write(fns, bns, "BaseIterativeData", 1);
-//    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
-//    int N = 1;
-//    cg_array_write("TimeValues", RealDouble, 1, &N, &ttime);
-//    cg_ziter_write(fns, bns, zns, "ZoneIterativeData");
-//    cg_goto(fns, bns, "Zone_t", zns, "ZoneIterativeData_t", 1, "end");
-//    cg_simulation_type_write(fns, bns, TimeAccurate);
-//    cg_close(fns);
-//  } else {
-//    // modify the timeseries file
-//    cg_open(sname, CG_MODE_MODIFY, &fns);
-//    cg_gopath(fns, "/Base");
-//    cg_where(&fns, &bns, &depth, &label, &index);
-//    int N = 0;
-//    cg_biter_read(fns, bns, bitername, &N);
-//    free(tseries);
-//    tseries = malloc((N+1) * sizeof(real));
-//    cpumem = (N+1) * sizeof(real);
-//    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
-//    cg_array_read(1, tseries);
-//    cg_biter_write(fns, bns, "BaseIterativeData", N+1);
-//    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
-//    tseries[N] = ttime;
-//    tsize[0] = N+1;
-//    cg_array_write("TimeValues", RealDouble, 1, tsize, tseries);
-//    cg_goto(fns, bns, "Zone_t", 1, "end");
-//    char solname2[CHAR_BUF_SIZE];
-//    sprintf(solname2, "Solution-%s", format);
-//    sprintf(solname2, solname2, tout);
-//    cg_link_write(solname2, fname, "Base/Zone0/Solution");
-//    cg_close(fns);
-//   
-//    free(tseries);
-//    free(label);
-//    free(bitername);
-//  }
+  if(cg_is_cgns(sname, &fns) != 0) {
+    // if it does not exist, create it
+    cg_open(sname, CG_MODE_WRITE, &fns);
+    cg_base_write(fn, "Base", 3, 3, &bns);
+    //cgsize_t size[9];
+    size[0] = Dom.xn+1; // cells -> vertices
+    size[1] = Dom.yn+1;
+    size[2] = Dom.zn+1;
+    size[3] = Dom.xn;
+    size[4] = Dom.yn;
+    size[5] = Dom.zn;
+    size[6] = 0;
+    size[7] = 0;
+    size[8] = 0;
+    cg_zone_write(fns, bns, "Zone0", size, Structured, &zns);
+    cg_goto(fns, bns, "Zone_t", zns, "end");
+    cg_link_write("GridCoordinates", gname, "Base/Zone0/GridCoordinates");
+    char solname2[CHAR_BUF_SIZE];
+    sprintf(solname2, "Solution-%s", format);
+    sprintf(solname2, solname2, tout);
+    cg_link_write(solname2, fname, "Base/Zone0/Solution");
+    cg_biter_write(fns, bns, "BaseIterativeData", 1);
+    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
+    int N = 1;
+    cg_array_write("TimeValues", RealDouble, 1, &N, &ttime);
+    cg_ziter_write(fns, bns, zns, "ZoneIterativeData");
+    cg_goto(fns, bns, "Zone_t", zns, "ZoneIterativeData_t", 1, "end");
+    cg_simulation_type_write(fns, bns, TimeAccurate);
+    cg_close(fns);
+  } else {
+    // modify the timeseries file
+    cg_open(sname, CG_MODE_MODIFY, &fns);
+    cg_gopath(fns, "/Base");
+    cg_where(&fns, &bns, &depth, &label, &index);
+    int N = 0;
+    cg_biter_read(fns, bns, bitername, &N);
+    free(tseries);
+    tseries = malloc((N+1) * sizeof(real));
+    cpumem = (N+1) * sizeof(real);
+    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
+    cg_array_read(1, tseries);
+    cg_biter_write(fns, bns, "BaseIterativeData", N+1);
+    cg_goto(fns, bns, "BaseIterativeData_t", 1, "end");
+    tseries[N] = ttime;
+    tsize[0] = N+1;
+    cg_array_write("TimeValues", RealDouble, 1, tsize, tseries);
+    cg_goto(fns, bns, "Zone_t", 1, "end");
+    char solname2[CHAR_BUF_SIZE];
+    sprintf(solname2, "Solution-%s", format);
+    sprintf(solname2, solname2, tout);
+    cg_link_write(solname2, fname, "Base/Zone0/Solution");
+    cg_close(fns);
+   
+    free(tseries);
+    free(label);
+    free(bitername);
+  }
+  */
 }
 
 void cgns_particles(real dtout)

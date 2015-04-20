@@ -11,7 +11,9 @@ __global__ void kernel_numberdensity_particle_velz(real val,
                                                    real* velpz,
                                                    real *velz,
                                                    real *dia,
-                                                   dom_struct *dom);
+                                                   dom_struct *dom,
+                                                   real *bdenf,
+                                                   real rho_fluid);
  
 __global__ void kernel_march_numberdensity(real dt,
                                            dom_struct *dom,
@@ -52,11 +54,13 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
                                     real *numd,
                                     real *conc,
                                     real *dia,
+                                    real *bdenf,
                                     real *mdot, 
                                     real scale,
                                     real ccdiss,
                                     real ccdiff,
-                                    real nu);
+                                    real nu,
+                                    real rho_fluid);
 
 __global__ void BC_p_B_D(real *p,
                          dom_struct *dom,
@@ -79,7 +83,9 @@ __global__ void kernel_forcing_add_z_field_bubble(real scale,
                                                   real *ndfz,
                                                   real *diafz,
                                                   real *fz,
-                                                  dom_struct *dom);
+                                                  dom_struct *dom,
+                                                  real *bdenf,
+                                                  real rho_fluid);
 
 
 __global__ void kernel_inner_scalarfield_update_x(dom_struct *dom,
