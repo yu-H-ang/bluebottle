@@ -165,8 +165,6 @@ real Kd;
 //##############################################################################
 // used by Eulerian branch
 
-real *cgns_tseries;
-char **cgns_solname;
 // number density equation
 real bubble_radius;
 int bubble_init_cond;
@@ -177,14 +175,28 @@ numdenBC_struct numdenBC;
 real *numden;
 real totalnumden;
 real *w_b;
+real *ter_cell;
 real **_numden;
 real **_nextnumden;
 real **_w_b;
+real **_ter_cell;
 real **_f_z_coupling_numden;
+real *numGau;
+real **_numGau;
+real **_numGau_temp;
+real *masGau;
+real **_masGau;
+real **_masGau_temp;
+BubGen_struct BubbleGenerator;
+real *BGndot;
+real **_BGndot;
+real *BGmdot;
+real **_BGmdot;
+real TerminalVelocityLimit;
 
 // concentration equation
 real concen_diff;
-real concen_diss;
+real concen_atm;
 int concen_init_cond;
 real concen_init_cond_uniform_m;
 int concen_init_cond_random_min;
@@ -195,11 +207,14 @@ real **_concen;
 real **_nextconcen;
 real **_velmag;
 real **_mdot;
+real *concen_sat;
+real **_concen_sat;
 
 // bubble mass equation
 real *bubmas;
 real **_bubmas;
 real **_nextbubmas;
+real *bubdia;
 real **_bubdia;
 real **_bubdiafz;
 int bubmas_init_cond;
@@ -214,6 +229,7 @@ real **_bubden_face;
 real pressure_atm;
 real rho_atm;
 real grav_acc;
+int turb_switch;
 //##############################################################################
 
 int main(int argc, char *argv[]) {
@@ -384,7 +400,7 @@ int main(int argc, char *argv[]) {
       // initialize the domain
       printf("Initializing domain variables...");
       fflush(stdout);
-      int domain_init_flag = domain_init();
+      int domain_init_flag = domain_init_Eulerian();//##########################
       printf("done.\n");
       fflush(stdout);
       if(domain_init_flag == EXIT_FAILURE) {
@@ -397,10 +413,11 @@ int main(int argc, char *argv[]) {
       // initialization for Eulerian branch
       printf("Initializing variables for Eulerian branch...");
       fflush(stdout);
-      int Eulerian_init_flag = Eulerian_init();
+      int Eulerian_init_flag1 = Eulerian_init();
+      int Eulerian_init_flag2 = Eulerian_init_parameters();
       printf("done.\n");
       fflush(stdout);
-      if(Eulerian_init_flag == EXIT_FAILURE) {
+      if(Eulerian_init_flag1 == EXIT_FAILURE || Eulerian_init_flag2 == EXIT_FAILURE) {
         printf("\nThe initial configuration for Eulerian branch is not allowed.\n");
         return EXIT_FAILURE;
       }
@@ -419,7 +436,7 @@ int main(int argc, char *argv[]) {
         printf("\nThe initial particle configuration is not allowed.\n");
         return EXIT_FAILURE;
       }
-
+      
       // allocate device memory
       printf("Allocating domain CUDA device memory...");
       fflush(stdout);
@@ -474,16 +491,19 @@ int main(int argc, char *argv[]) {
       cuda_part_pull();
 
       // run restart if requested
+      //########################################################################
       if(runrestart == 1) {
         printf("\nRestart requested.\n\n");
         printf("Reading restart file...");
         fflush(stdout);
-        in_restart();
+        Eulerian_init_parameters();
+        in_restart_Eulerian();
         printf("done.\n");
         fflush(stdout);
         printf("Copying host domain data to devices...");
         fflush(stdout);
         cuda_dom_push();
+        cuda_Eulerian_push();
         printf("done.\n");
         fflush(stdout);
         printf("Copying host particle data to devices...");
@@ -496,7 +516,7 @@ int main(int argc, char *argv[]) {
           restart_stop = 1;
         }
       }
-      
+      //########################################################################
       
       //########################################################################
       // print config info
@@ -590,15 +610,17 @@ int main(int argc, char *argv[]) {
             printf("done.               \n");
             fflush(stdout);
         #else
+          //####################################################################
           if(rec_flow_field_dt > 0) {
             printf("Writing flow field file t = %e...", ttime);
             fflush(stdout);
             cgns_grid_Eulerian();
-            cgns_flow_field_Eulerian(rec_flow_field_dt);
+            cgns_flow_field_Eulerian2();
             rec_flow_field_stepnum_out++;
             printf("done.               \n");
             fflush(stdout);
           }
+          //####################################################################
           if(rec_particle_dt > 0) {
             printf("Writing particle file t = %e...", ttime);
             fflush(stdout);
@@ -620,7 +642,6 @@ int main(int argc, char *argv[]) {
 
         #endif
         }
-
         
         /******************************************************************/
         /** Begin the main timestepping loop in the experimental domain. **/
@@ -635,21 +656,24 @@ int main(int argc, char *argv[]) {
           printf("FLOW: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
           fflush(stdout);
           
-          // everything is explicitly computed
-          //####################################################################
-          // compute bubble diameter
-          cuda_compute_bubble_diameter();
-          // calculate bubble velocity(only vertical direction)
-          cuda_compute_particle_velz();
-          // compute coupling force
-          cuda_compute_coupling_forcing();
-          // compute mass transfer rate
-          cuda_compute_mdot();
+          // Eulerian branch! Everything is explicitly computed
           //####################################################################
           
-          //####################################################################
+          // calculate cell-centered bubble diameters, then cell-centered
+          // terminal velocity, then add it to fluid velocity field,
+          // get bubble velocity.
+          cuda_add_terminal_velz();
+          
+          // compute mass transfer rate, all values are at cell centers, bubble
+          // diameters are needed, they are already calculated above.
+          cuda_compute_mdot();
+          
+          //advance three equations
+          //cuda_num_mas_BC_compute(); Amplitude gradually enhanced on boundary
+          
           // number density equation
           cuda_numberdensity_march();
+          // NOTE!: upwinding BC
           cuda_numberdensity_BC();
           
           // concentration equation
@@ -658,7 +682,22 @@ int main(int argc, char *argv[]) {
           
           // bubble mass field
           cuda_bubblemass_march();
+          // NOTE!: upwinding BC
           cuda_bubblemass_BC();
+          
+          
+          // compute face-centered bubble diameter, note that we need to
+          // re-calculate cell-centered bubble diameters and bubble velocity.
+          cuda_add_terminal_velz();
+          cuda_coupling_force_preparation();
+          
+          // compute coupling force
+          cuda_compute_coupling_force();
+          
+          // turbulent forcing, turbl is initialized in domain.c
+          if(turb_switch == ON) {
+              cuda_compute_turb_forcing();
+          }
           //####################################################################
           
           cuda_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);
@@ -666,10 +705,10 @@ int main(int argc, char *argv[]) {
           
           // update the boundary condition config info and share with precursor
           expd_update_BC(np, status);
-
+          
           // TODO: save work by rebuilding only the cages that need to be rebuilt
           cuda_build_cages();
-
+          
           int iter = 0;
           real iter_err = FLT_MAX;
           while(iter_err > lamb_residual) {  // iterate for Lamb's coefficients
@@ -688,15 +727,19 @@ int main(int argc, char *argv[]) {
             cuda_wstar_helmholtz(rank);
 */
             // apply boundary conditions to U_star
+            /*
             if(nparts > 0) {
               cuda_part_BC_star();
             }
+            */
             cuda_dom_BC_star();
             // enforce solvability condition
             cuda_solvability();
+            /*
             if(nparts > 0) {
               cuda_part_BC_star();
             }
+            */
             cuda_dom_BC_star();
             // solve for pressure
             cuda_PP_bicgstab(rank);
@@ -704,9 +747,11 @@ int main(int argc, char *argv[]) {
             // solve for U
             cuda_project();
             // apply boundary conditions to field variables
+            /*
             if(nparts > 0) {
               cuda_part_BC();
             }
+            */
             cuda_dom_BC();
             // update pressure
             cuda_update_p();
@@ -739,10 +784,10 @@ int main(int argc, char *argv[]) {
               break;
             }
           }
-/*##############################################################################
+          /*####################################################################
           printf("  The Lamb's coefficients converged in");
           printf(" %d iterations.\n", iter);
-##############################################################################*/
+          ####################################################################*/
           if(!lambflag) {
             // store u, conv, and coeffs for use in next timestep
             cuda_store_u();
@@ -779,7 +824,7 @@ int main(int argc, char *argv[]) {
                   ttime);
                 fflush(stdout);
               #endif
-              cgns_flow_field_Eulerian(rec_flow_field_dt);
+              cgns_flow_field_Eulerian2();
               printf("  Writing flow field file t = %e...done.\n", ttime);
               fflush(stdout);
               rec_flow_field_ttime_out = rec_flow_field_ttime_out
@@ -847,7 +892,8 @@ int main(int argc, char *argv[]) {
               fflush(stdout);
               cuda_dom_pull();
               cuda_part_pull();
-              out_restart();
+              cuda_Eulerian_pull();
+              out_restart_Eulerian();
               printf("done.               \n");
               fflush(stdout);
               rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
@@ -867,18 +913,13 @@ int main(int argc, char *argv[]) {
         /**The end of main timestepping loop in the experimental domain. **/
         /******************************************************************/
         
-        
-        cgns_finish_Eulerian();
-        
-        
-        
-        
         if(rec_restart_dt > 0 && ttime >= duration && !restart_stop) {
           printf("  Writing final restart file (t = %e)...", ttime);
           fflush(stdout);
           cuda_dom_pull();
           cuda_part_pull();
-          out_restart();
+          cuda_Eulerian_pull();
+          out_restart_Eulerian();
           printf("done.               \n");
           fflush(stdout);
           rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
