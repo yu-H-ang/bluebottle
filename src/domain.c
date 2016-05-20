@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@
 
 #include "bluebottle.h"
 #include "domain.h"
-#include "Eulerian.h"
 
 int nsubdom;
 
@@ -39,7 +38,7 @@ void domain_read_input(void)
   gpumem = 0;
 
   // open configuration file for reading
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
   sprintf(fname, "%s/input/flow.config", ROOT_DIR);
   FILE *infile = fopen(fname, "r");
   if(infile == NULL) {
@@ -47,7 +46,7 @@ void domain_read_input(void)
     exit(EXIT_FAILURE);
   }
 
-  char buf[CHAR_BUF_SIZE];  // character read buffer
+  char buf[CHAR_BUF_SIZE] = "";  // character read buffer
 
   // read domain
   fret = fscanf(infile, "DOMAIN\n");
@@ -123,79 +122,91 @@ void domain_read_input(void)
   fret = fscanf(infile, "\n");
 
   fret = fscanf(infile, "BOUNDARY CONDITIONS\n");
+#ifdef DOUBLE
+  fret = fscanf(infile, "vel_tDelay %lf\n", &vel_tDelay);
+#else  
+  fret = fscanf(infile, "vel_tDelay %f\n", &vel_tDelay);
+#endif
   fret = fscanf(infile, "PRESSURE\n");
   fret = fscanf(infile, "bc.pW %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pW = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsW = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pW = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsW);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pE %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pE = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsE = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pE = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsE);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pS %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pS = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsS = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pS = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsS);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pN %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pN = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsN = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pN = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsN);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pB %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pB = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsB = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pB = NEUMANN;
-  //############################################################################
-  else if(strcmp(buf, "DIRICHLET") == 0) {
-    bc.pB = DIRICHLET;
-    fret = fscanf(infile, " %lf", &bc.pBD);
-  }
-  //############################################################################
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsB);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pT %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pT = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsT = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pT = NEUMANN;
-  //############################################################################
-  else if(strcmp(buf, "DIRICHLET") == 0) {
-    bc.pT = DIRICHLET;
-    fret = fscanf(infile, " %lf", &bc.pTD);
-  }
-  //############################################################################
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsT);
+  } else {
     fprintf(stderr, "flow.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
+
+  if (bc.dsE < 0 || bc.dsW < 0 || 
+      bc.dsN < 0 || bc.dsS < 0 || 
+      bc.dsT < 0 || bc.dsB < 0) {
+    fprintf(stderr, "flow.config read error -- screen offsets must be >= 0\n");
+    exit(EXIT_FAILURE);
+  }
 
   fret = fscanf(infile, "X-VELOCITY\n");
 
@@ -207,9 +218,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uWDm, &bc.uWDa);
     bc.uWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uW = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uWDm = 0;
+    bc.uWDa = 0;
+    bc.uWD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uW = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uWDm, &bc.uWDa);
     bc.uWD = 0;
@@ -227,9 +241,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uEDm, &bc.uEDa);
     bc.uED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uE = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uEDm = 0;
+    bc.uEDa = 0;
+    bc.uED = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uE = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uEDm, &bc.uEDa);
     bc.uED = 0;
@@ -247,9 +264,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uSDm, &bc.uSDa);
     bc.uSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uS = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uSDm = 0;
+    bc.uSDa = 0;
+    bc.uSD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uS = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uSDm, &bc.uSDa);
     bc.uSD = 0;
@@ -267,9 +287,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uNDm, &bc.uNDa);
     bc.uND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uN = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uNDm = 0;
+    bc.uNDa = 0;
+    bc.uND = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uN = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uNDm, &bc.uNDa);
     bc.uND = 0;
@@ -287,9 +310,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uBDm, &bc.uBDa);
     bc.uBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uB = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uBDm = 0;
+    bc.uBDa = 0;
+    bc.uBD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uB = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uBDm, &bc.uBDa);
     bc.uBD = 0;
@@ -307,9 +333,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uTDm, &bc.uTDa);
     bc.uTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uT = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.uTDm = 0;
+    bc.uTDa = 0;
+    bc.uTD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.uT = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.uTDm, &bc.uTDa);
     bc.uTD = 0;
@@ -330,9 +359,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vWDm, &bc.vWDa);
     bc.vWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vW = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vWDm = 0;
+    bc.vWDa = 0;
+    bc.vWD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vW = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vWDm, &bc.vWDa);
     bc.vWD = 0;
@@ -350,9 +382,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vEDm, &bc.vEDa);
     bc.vED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vE = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vEDm = 0;
+    bc.vEDa = 0;
+    bc.vED = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vE = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vEDm, &bc.vEDa);
     bc.vED = 0;
@@ -370,9 +405,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vSDm, &bc.vSDa);
     bc.vSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vS = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vSDm = 0;
+    bc.vSDa = 0;
+    bc.vSD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vS = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vSDm, &bc.vSDa);
     bc.vSD = 0;
@@ -390,9 +428,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vNDm, &bc.vNDa);
     bc.vND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vN = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vNDm = 0;
+    bc.vNDa = 0;
+    bc.vND = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vN = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vNDm, &bc.vNDa);
     bc.vND = 0;
@@ -410,9 +451,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vBDm, &bc.vBDa);
     bc.vBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vB = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vBDm = 0;
+    bc.vBDa = 0;
+    bc.vBD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vB = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vBDm, &bc.vBDa);
     bc.vBD = 0;
@@ -430,9 +474,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vTDm, &bc.vTDa);
     bc.vTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vT = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.vTDm = 0;
+    bc.vTDa = 0;
+    bc.vTD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.vT = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.vTDm, &bc.vTDa);
     bc.vTD = 0;
@@ -453,9 +500,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wWDm, &bc.wWDa);
     bc.wWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wW = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wWDm = 0;
+    bc.wWDa = 0;
+    bc.wWD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wW = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wWDm, &bc.wWDa);
     bc.wWD = 0;
@@ -473,9 +523,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wEDm, & bc.wEDa);
     bc.wED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wE = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wEDm = 0;
+    bc.wEDa = 0;
+    bc.wED = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wE = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wEDm, &bc.wEDa);
     bc.wED = 0;
@@ -493,9 +546,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wSDm, &bc.wSDa);
     bc.wSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wS = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wSDm = 0;
+    bc.wSDa = 0;
+    bc.wSD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wS = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wSDm, &bc.wSDa);
     bc.wSD = 0;
@@ -513,9 +569,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wNDm, &bc.wNDa);
     bc.wND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wN = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wNDm = 0;
+    bc.wNDa = 0;
+    bc.wND = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wN = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wNDm, &bc.wNDa);
     bc.wND = 0;
@@ -533,9 +592,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wBDm, &bc.wBDa);
     bc.wBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wB = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wBDm = 0;
+    bc.wBDa = 0;
+    bc.wBD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wB = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wBDm, &bc.wBDa);
     bc.wBD = 0;
@@ -553,9 +615,12 @@ void domain_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wTDm, &bc.wTDa);
     bc.wTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wT = NEUMANN;
-  else if(strcmp(buf, "PRECURSOR") == 0) {
+    bc.wTDm = 0;
+    bc.wTDa = 0;
+    bc.wTD = 0;
+  } else if(strcmp(buf, "PRECURSOR") == 0) {
     bc.wT = PRECURSOR;
     fret = fscanf(infile, "%lf %lf", &bc.wTDm, &bc.wTDa);
     bc.wTD = 0;
@@ -610,6 +675,11 @@ void domain_read_input(void)
   fret = fscanf(infile, "\n");
 
   fret = fscanf(infile, "SIMULATION DRIVING CONDITIONS\n");
+#ifdef DOUBLE
+  fret = fscanf(infile, "p_tDelay %lf\n", &p_tDelay);
+#else  
+  fret = fscanf(infile, "p_tDelay %f\n", &p_tDelay);
+#endif
   turbA = 0.; // prevent turbulence linear forcing from being used
 #ifdef DOUBLE
   fret = fscanf(infile, "gradP.x %lf %lf\n", &gradP.xm, &gradP.xa);
@@ -618,6 +688,11 @@ void domain_read_input(void)
   gradP.y = 0;
   fret = fscanf(infile, "gradP.z %lf %lf\n", &gradP.zm, &gradP.za);
   gradP.z = 0;
+#ifdef DOUBLE
+  fret = fscanf(infile, "g_tDelay %lf\n", &g_tDelay);
+#else  
+  fret = fscanf(infile, "g_tDelay %f\n", &g_tDelay);
+#endif
   fret = fscanf(infile, "g.x %lf %lf\n", &g.xm, &g.xa);
   g.x = 0;
   fret = fscanf(infile, "g.y %lf %lf\n", &g.ym, &g.ya);
@@ -667,7 +742,7 @@ void turb_read_input(void)
   gpumem = 0;
 
   // open configuration file for reading
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
   sprintf(fname, "%s/input/turb.config", ROOT_DIR);
   FILE *infile = fopen(fname, "r");
   if(infile == NULL) {
@@ -675,7 +750,7 @@ void turb_read_input(void)
     exit(EXIT_FAILURE);
   }
 
-  char buf[CHAR_BUF_SIZE];  // character read buffer
+  char buf[CHAR_BUF_SIZE] = "";  // character read buffer
 
   // read domain
   fret = fscanf(infile, "DOMAIN\n");
@@ -748,63 +823,76 @@ void turb_read_input(void)
   fret = fscanf(infile, "\n");
 
   fret = fscanf(infile, "BOUNDARY CONDITIONS\n");
+  vel_tDelay = 0;
   fret = fscanf(infile, "PRESSURE\n");
   fret = fscanf(infile, "bc.pW %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pW = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsW = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pW = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsW);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pE %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pE = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsE = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pE = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsE);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pS %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pS = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsS = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pS = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsS);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pN %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pN = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsN = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pN = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsN);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pB %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pB = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsB = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pB = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsB);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
   fret = fscanf(infile, "\n");
   fret = fscanf(infile, "bc.pT %s", buf);
-  if(strcmp(buf, "PERIODIC") == 0)
+  if(strcmp(buf, "PERIODIC") == 0) {
     bc.pT = PERIODIC;
-  else if(strcmp(buf, "NEUMANN") == 0)
+    bc.dsT = 0;
+  } else if(strcmp(buf, "NEUMANN") == 0) {
     bc.pT = NEUMANN;
-  else {
+    fret = fscanf(infile, "%lf", &bc.dsT);
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -820,9 +908,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uWDm, &bc.uWDa);
     bc.uWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uW = NEUMANN;
-  else {
+    bc.uWDm = 0;
+    bc.uWDa = 0;
+    bc.uWD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -835,9 +926,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uEDm, &bc.uEDa);
     bc.uED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uE = NEUMANN;
-  else {
+    bc.uEDm = 0;
+    bc.uEDa = 0;
+    bc.uED = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -850,9 +944,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uSDm, &bc.uSDa);
     bc.uSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uS = NEUMANN;
-  else {
+    bc.uSDm = 0;
+    bc.uSDa = 0;
+    bc.uSD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -865,9 +962,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uNDm, &bc.uNDa);
     bc.uND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uN = NEUMANN;
-  else {
+    bc.uNDm = 0;
+    bc.uNDa = 0;
+    bc.uND = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -880,9 +980,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uBDm, &bc.uBDa);
     bc.uBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uB = NEUMANN;
-  else {
+    bc.uBDm = 0;
+    bc.uBDa = 0;
+    bc.uBD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -895,9 +998,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.uTDm, &bc.uTDa);
     bc.uTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.uT = NEUMANN;
-  else {
+    bc.uTDm = 0;
+    bc.uTDa = 0;
+    bc.uTD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -913,9 +1019,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vWDm, &bc.vWDa);
     bc.vWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vW = NEUMANN;
-  else {
+    bc.vWDm = 0;
+    bc.vWDa = 0;
+    bc.vWD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -928,9 +1037,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vEDm, &bc.vEDa);
     bc.vED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vE = NEUMANN;
-  else {
+    bc.vEDm = 0;
+    bc.vEDa = 0;
+    bc.vED = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -943,9 +1055,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vSDm, &bc.vSDa);
     bc.vSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vS = NEUMANN;
-  else {
+    bc.vSDm = 0;
+    bc.vSDa = 0;
+    bc.vSD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -958,9 +1073,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vNDm, &bc.vNDa);
     bc.vND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vN = NEUMANN;
-  else {
+    bc.vNDm = 0;
+    bc.vNDa = 0;
+    bc.vND = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -973,9 +1091,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vBDm, &bc.vBDa);
     bc.vBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vB = NEUMANN;
-  else {
+    bc.vBDm = 0;
+    bc.vBDa = 0;
+    bc.vBD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -988,9 +1109,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.vTDm, &bc.vTDa);
     bc.vTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.vT = NEUMANN;
-  else {
+    bc.vTDm = 0;
+    bc.vTDa = 0;
+    bc.vTD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1006,9 +1130,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wWDm, &bc.wWDa);
     bc.wWD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wW = NEUMANN;
-  else {
+    bc.wWDm = 0;
+    bc.wWDa = 0;
+    bc.wWD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1021,9 +1148,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wEDm, & bc.wEDa);
     bc.wED = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wE = NEUMANN;
-  else {
+    bc.wEDm = 0;
+    bc.wEDa = 0;
+    bc.wED = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1036,9 +1166,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wSDm, &bc.wSDa);
     bc.wSD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wS = NEUMANN;
-  else {
+    bc.wSDm = 0;
+    bc.wSDa = 0;
+    bc.wSD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1051,9 +1184,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wNDm, &bc.wNDa);
     bc.wND = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wN = NEUMANN;
-  else {
+    bc.wNDm = 0;
+    bc.wNDa = 0;
+    bc.wND = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1066,9 +1202,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wBDm, &bc.wBDa);
     bc.wBD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wB = NEUMANN;
-  else {
+    bc.wBDm = 0;
+    bc.wBDa = 0;
+    bc.wBD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1081,9 +1220,12 @@ void turb_read_input(void)
     fret = fscanf(infile, "%lf %lf", &bc.wTDm, &bc.wTDa);
     bc.wTD = 0;
   }
-  else if(strcmp(buf, "NEUMANN") == 0)
+  else if(strcmp(buf, "NEUMANN") == 0) {
     bc.wT = NEUMANN;
-  else {
+    bc.wTDm = 0;
+    bc.wTDa = 0;
+    bc.wTD = 0;
+  } else {
     fprintf(stderr, "turb.config read error.\n");
     exit(EXIT_FAILURE);
   }
@@ -1122,6 +1264,7 @@ void turb_read_input(void)
   fret = fscanf(infile, "turbA %f\n", &turbA);
 #endif
   // these are unnecessary in the precursor
+  p_tDelay = 0;
   gradP.x = 0.;
   gradP.xm = 0.;
   gradP.xa = 0.;
@@ -1131,6 +1274,7 @@ void turb_read_input(void)
   gradP.z = 0.;
   gradP.zm = 0.;
   gradP.za = 0.;
+  g_tDelay = 0; 
   g.x = 0.;
   g.xm = 0.;
   g.xa = 0.;
@@ -1413,6 +1557,15 @@ void domain_show_config(void)
   if(bc.wB == DIRICHLET) printf(" %f", bc.wBDm);
   printf(", bc.wT = %d", bc.wT);
   if(bc.wT == DIRICHLET) printf(" %f", bc.wTDm);
+  printf("\n");
+
+  printf("Screen offsets:\n");
+  printf("  bc.dsW = %f\n", bc.dsW);
+  printf("  bc.dsE = %f\n", bc.dsE);
+  printf("  bc.dsS = %f\n", bc.dsS);
+  printf("  bc.dsN = %f\n", bc.dsN);
+  printf("  bc.dsB = %f\n", bc.dsB);
+  printf("  bc.dsT = %f\n", bc.dsT);
   printf("\n");
 
   printf("Applied Pressure Gradient:\n");
@@ -1856,6 +2009,8 @@ int domain_init(void)
   cpumem += Dom.Gcc.s3b * sizeof(real);
   p = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
   cpumem += Dom.Gcc.s3b * sizeof(real);
+  phi = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
+  cpumem += Dom.Gcc.s3 * sizeof(real);
   //divU = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
   cpumem += Dom.Gcc.s3b * sizeof(real);
   u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
@@ -1870,12 +2025,14 @@ int domain_init(void)
   cpumem += Dom.Gfy.s3b * sizeof(real);
   w0 = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
   cpumem += Dom.Gfz.s3b * sizeof(real);
+#ifndef IMPLICIT
   diff0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
   cpumem += Dom.Gfx.s3b * sizeof(real);
   diff0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
   cpumem += Dom.Gfy.s3b * sizeof(real);
   diff0_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
   cpumem += Dom.Gfz.s3b * sizeof(real);
+#endif
   conv0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
   cpumem += Dom.Gfx.s3b * sizeof(real);
   conv0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
@@ -1929,12 +2086,15 @@ int domain_init(void)
   for(i = 0; i < Dom.Gcc.s3b; i++) {
     p0[i] = 0.;
     p[i] = 0.;
+    phi[i] = 0.;
     //divU[i] = 0.;
   }
 
   for(i = 0; i < Dom.Gfx.s3b; i++) {
     u[i] = 0.;
+#ifndef IMPLICIT
     diff0_u[i] = 0.;
+#endif
     diff_u[i] = 0.;
     u0[i] = 0.;
     conv0_u[i] = 0.;
@@ -1944,7 +2104,9 @@ int domain_init(void)
   }
   for(i = 0; i < Dom.Gfy.s3b; i++) {
     v[i] = 0.;
+#ifndef IMPLICIT
     diff0_v[i] = 0.;
+#endif
     diff_v[i] = 0.;
     v0[i] = 0.;
     conv0_v[i] = 0.;
@@ -1954,7 +2116,9 @@ int domain_init(void)
   }
   for(i = 0; i < Dom.Gfz.s3b; i++) {
     w[i] = 0.;
+#ifndef IMPLICIT
     diff0_w[i] = 0.;
+#endif
     diff_w[i] = 0.;
     w0[i] = 0.;
     conv0_w[i] = 0.;
@@ -1963,8 +2127,11 @@ int domain_init(void)
     w_star[i] = 0.;
   }
 
-  // initialize TAYLOR_GREEN vortex
 /*
+  // initialize TAYLOR_GREEN vortex
+  //dt = 0.015199416342412e-4;
+  //dt = 0.060562015503876e-4;
+  dt = 0.240384615384615e-4/2.;
   for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
     for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
       for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
@@ -1973,13 +2140,13 @@ int domain_init(void)
         real z = (k-0.5) * Dom.dz + Dom.zs;
         int C = i+j*Dom.Gfx.s1b+k*Dom.Gfx.s2b;
         u[C] = cos(2.*PI*x)*sin(2.*PI*y);
-        u0[C] = u[C] * exp(16.*PI*PI*1.0e-6);
+        u0[C] = u[C] * exp(16.*PI*PI*dt);
         conv0_u[C] = -4.*PI*sin(2.*PI*x)*cos(2.*PI*x)*sin(2.*PI*y)*sin(2.*PI*y)
           + 2.*PI*sin(2.*PI*x)*cos(2.*PI*x)
           *(sin(2.*PI*y)*sin(2.*PI*y)-cos(2.*PI*y)*cos(2.*PI*y));
-        conv0_u[C] *= exp(16.*PI*PI*1.0e-6);
+        conv0_u[C] *= exp(16.*PI*PI*dt);
         diff0_u[C] = -8.*PI*PI*nu*cos(2.*PI*x)*sin(2.*PI*y);
-        diff0_u[C] *= exp(16.*PI*PI*1.0e-6);
+        diff0_u[C] *= exp(16.*PI*PI*dt);
       }
     }
   }
@@ -1991,13 +2158,13 @@ int domain_init(void)
         real z = (k-0.5) * Dom.dz + Dom.zs;
         int C = i+j*Dom.Gfy.s1b+k*Dom.Gfy.s2b;
         v[C] = -sin(2.*PI*x)*cos(2.*PI*y);
-        v0[C] = v[C] * exp(16.*PI*PI*1.0e-6);
+        v0[C] = v[C] * exp(16.*PI*PI*dt);
         conv0_v[C] = -4.*PI*sin(2.*PI*x)*sin(2.*PI*x)*sin(2.*PI*y)*cos(2.*PI*y)
           + 2.*PI*sin(2.*PI*y)*cos(2.*PI*y)
           *(sin(2.*PI*x)*sin(2.*PI*x)-cos(2.*PI*x)*cos(2.*PI*x));
-        conv0_v[C] *= exp(16.*PI*PI*1.0e-6);
+        conv0_v[C] *= exp(16.*PI*PI*dt);
         diff0_v[C] = 8.*PI*PI*nu*sin(2.*PI*x)*cos(2.*PI*y);
-        diff0_v[C] *= exp(16.*PI*PI*1.0e-6);
+        diff0_v[C] *= exp(16.*PI*PI*dt);
       }
     }
   }
@@ -2017,8 +2184,8 @@ int domain_init(void)
         real y = (j-0.5) * Dom.dy + Dom.ys;
         real z = (k-0.5) * Dom.dz + Dom.zs;
         int C = i+j*Dom.Gcc.s1b+k*Dom.Gcc.s2b;
-        p0[C] = -0.25*rho_f*(cos(2.*2.*PI*x)+cos(2.*2.*PI*y))*exp(16.*PI*PI*0.0e-6);
-        p[C] = -0.25*rho_f*(cos(2.*2.*PI*x)+cos(2.*2.*PI*y))*exp(16.*PI*PI*0.0e-6);
+        p0[C] = -0.25*rho_f*(cos(2.*2.*PI*x)+cos(2.*2.*PI*y))*exp(16.*PI*PI*dt/2.);
+        p[C] = -0.25*rho_f*(cos(2.*2.*PI*x)+cos(2.*2.*PI*y))*exp(16.*PI*PI*dt/2.);
       }
     }
   }
@@ -2137,25 +2304,29 @@ int domain_init(void)
   }
 
   // initialize some variables
-  dt = 2 * nu / (Dom.dx * Dom.dx);
-  dt += 2 * nu / (Dom.dy * Dom.dy);
-  dt += 2 * nu / (Dom.dz * Dom.dz);
+  real dx_min = Dom.dx;
+  if(Dom.dy < dx_min) dx_min = Dom.dy;
+  if(Dom.dz < dx_min) dx_min = Dom.dz;
+
+  dt = 2. * nu / (dx_min * dx_min);
+  dt += 2. * nu / (Dom.dy * Dom.dy);
+  dt += 2. * nu / (Dom.dz * Dom.dz);
   dt = CFL / dt;
   dt0 = -1.;
   stepnum = 0;
   rec_flow_field_stepnum_out = 0;
   rec_paraview_stepnum_out = 0;
   rec_particle_stepnum_out = 0;
-  rec_precursor_stepnum_out = 0;
+  rec_prec_stepnum_out = 0;
   rec_flow_field_ttime_out = 0;
   rec_paraview_ttime_out = 0;
   rec_particle_ttime_out = 0;
   rec_restart_ttime_out = 0;
-  rec_precursor_ttime_out = 0;
+  rec_prec_ttime_out = 0;
 
   turbl = 0.; // integral scale
               // (prevent turbulence linear forcing from being used)
-  
+
   return EXIT_SUCCESS;
 }
 
@@ -2580,6 +2751,8 @@ int domain_init_turb(void)
   cpumem += Dom.Gcc.s3b * sizeof(real);
   p = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
   cpumem += Dom.Gcc.s3b * sizeof(real);
+  phi = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
+  cpumem += Dom.Gcc.s3 * sizeof(real);
   //divU = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
   cpumem += Dom.Gcc.s3b * sizeof(real);
   u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
@@ -2594,12 +2767,14 @@ int domain_init_turb(void)
   cpumem += Dom.Gfy.s3b * sizeof(real);
   w0 = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
   cpumem += Dom.Gfz.s3b * sizeof(real);
+#ifndef IMPLICIT
   diff0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
   cpumem += Dom.Gfx.s3b * sizeof(real);
   diff0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
   cpumem += Dom.Gfy.s3b * sizeof(real);
   diff0_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
   cpumem += Dom.Gfz.s3b * sizeof(real);
+#endif
   conv0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
   cpumem += Dom.Gfx.s3b * sizeof(real);
   conv0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
@@ -2655,34 +2830,45 @@ int domain_init_turb(void)
   for(i = 0; i < Dom.Gcc.s3b; i++) {
     p0[i] = 0.;
     p[i] = 0.;
+    phi[i] = 0.;
     //divU[i] = 0.;
   }
+
   for(i = 0; i < Dom.Gfx.s3b; i++) {
     u[i] = 0.;
+#ifndef IMPLICIT
     diff0_u[i] = 0.;
+#endif
     diff_u[i] = 0.;
     u0[i] = 0.;
     conv0_u[i] = 0.;
     conv_u[i] = 0.;
     f_x[i] = 0.;
+    u_star[i] = 0.;
   }
   for(i = 0; i < Dom.Gfy.s3b; i++) {
     v[i] = 0.;
+#ifndef IMPLICIT
     diff0_v[i] = 0.;
+#endif
     diff_v[i] = 0.;
     v0[i] = 0.;
     conv0_v[i] = 0.;
     conv_v[i] = 0.;
     f_y[i] = 0.;
+    v_star[i] = 0.;
   }
   for(i = 0; i < Dom.Gfz.s3b; i++) {
     w[i] = 0.;
+#ifndef IMPLICIT
     diff0_w[i] = 0.;
+#endif
     diff_w[i] = 0.;
     w0[i] = 0.;
     conv0_w[i] = 0.;
     conv_w[i] = 0.;
     f_z[i] = 0.;
+    w_star[i] = 0.;
   }
 
   // integral scale
@@ -2707,7 +2893,7 @@ int domain_init_turb(void)
   }
 
   // calculate the divergence of U
-  real vol = (Dom.xn+2*DOM_BUF)*(Dom.yn+2*DOM_BUF)*(Dom.zn+2*DOM_BUF);
+  real vol = Dom.xn*Dom.yn*Dom.zn;
   for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
     for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
       for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
@@ -2736,7 +2922,6 @@ int domain_init_turb(void)
         E = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
         u[C] = u[C] - 0.5*(p[W] + p[E]);
         u0[C] = u0[C] - 0.5*(p[W] + p[E]);
-        umean += u[C];
       }
     }
   }
@@ -2748,7 +2933,6 @@ int domain_init_turb(void)
         N = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
         v[C] = v[C] - 0.5*(p[S] + p[N]);
         v0[C] = v0[C] - 0.5*(p[S] + p[N]);
-        vmean += v[C];
       }
     }
   }
@@ -2760,10 +2944,34 @@ int domain_init_turb(void)
         T = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
         w[C] = w[C] - 0.5*(p[B] + p[T]);
         w0[C] = w0[C] - 0.5*(p[B] + p[T]);
-        wmean += w[C];
       }
     }
   }
+
+  for(k = Dom.Gfx.ks; k < Dom.Gfx.ke; k++) {
+    for(j = Dom.Gfx.js; j < Dom.Gfx.je; j++) {
+      for(i = Dom.Gfx.is; i < Dom.Gfx.ie-1; i++) {
+        C = i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+        umean += u[C];
+      }
+    }
+  }
+  for(k = Dom.Gfy.ks; k < Dom.Gfy.ke; k++) {
+    for(j = Dom.Gfy.js; j < Dom.Gfy.je-1; j++) {
+      for(i = Dom.Gfy.is; i < Dom.Gfy.ie; i++) {
+        C = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+        vmean += v[C];
+      }
+    }
+  }
+  for(k = Dom.Gfz.ks; k < Dom.Gfz.ke-1; k++) {
+    for(j = Dom.Gfz.js; j < Dom.Gfz.je; j++) {
+      for(i = Dom.Gfz.is; i < Dom.Gfz.ie; i++) {
+        C = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
+        wmean += w[C];
+      }
+    }
+  } 
 
   umean /= vol;
   vmean /= vol;
@@ -2827,21 +3035,25 @@ int domain_init_turb(void)
   }
 
   // initialize some variables
-  dt = 2 * nu / (Dom.dx * Dom.dx);
-  dt += 2 * nu / (Dom.dy * Dom.dy);
-  dt += 2 * nu / (Dom.dz * Dom.dz);
+  real dx_min = Dom.dx;
+  if(Dom.dy < dx_min) dx_min = Dom.dy;
+  if(Dom.dz < dx_min) dx_min = Dom.dz;
+
+  dt = 2. * nu / (dx_min * dx_min);
+  //dt += 2. * nu / (Dom.dy * Dom.dy);
+  //dt += 2. * nu / (Dom.dz * Dom.dz);
   dt = CFL / dt;
   dt0 = -1.;
   stepnum = 0;
   rec_flow_field_stepnum_out = 0;
   rec_paraview_stepnum_out = 0;
   rec_particle_stepnum_out = 0;
-  rec_precursor_stepnum_out = 0;
+  rec_prec_stepnum_out = 0;
   rec_flow_field_ttime_out = 0;
   rec_paraview_ttime_out = 0;
   rec_particle_ttime_out = 0;
   rec_restart_ttime_out = 0;
-  rec_precursor_ttime_out = 0;
+  rec_prec_ttime_out = 0;
 
   return EXIT_SUCCESS;
 }
@@ -2851,6 +3063,7 @@ void domain_clean(void)
   free(dom);
   free(p0);
   free(p);
+  free(phi);
   //free(divU);
   free(u);
   free(v);
@@ -2858,9 +3071,11 @@ void domain_clean(void)
   free(u0);
   free(v0);
   free(w0);
+#ifndef IMPLICIT
   free(diff0_u);
   free(diff0_v);
   free(diff0_w);
+#endif
   free(conv0_u);
   free(conv0_v);
   free(conv0_w);
@@ -2889,86 +3104,87 @@ void domain_clean(void)
 
 void compute_vel_BC(void)
 {
-  // uWD
-  if(bc.uWDa == 0) bc.uWD = bc.uWDm;
-  else if(fabs(ttime*bc.uWDa) > fabs(bc.uWDm)) bc.uWD = bc.uWDm;
-  else bc.uWD = ttime*bc.uWDa;
-  // uED
-  if(bc.uEDa == 0) bc.uED = bc.uEDm;
-  else if(fabs(ttime*bc.uEDa) > fabs(bc.uEDm)) bc.uED = bc.uEDm;
-  else bc.uED = ttime*bc.uEDa;
-  // uSD
-  if(bc.uSDa == 0) bc.uSD = bc.uSDm;
-  else if(fabs(ttime*bc.uSDa) > fabs(bc.uSDm)) bc.uSD = bc.uSDm;
-  else bc.uSD = ttime*bc.uSDa;
-  // uND
-  if(bc.uNDa == 0) bc.uND = bc.uNDm;
-  else if(fabs(ttime*bc.uNDa) > fabs(bc.uNDm)) bc.uND = bc.uNDm;
-  else bc.uND = ttime*bc.uNDa;
-  // uBD
-  if(bc.uBDa == 0) bc.uBD = bc.uBDm;
-  else if(fabs(ttime*bc.uBDa) > fabs(bc.uBDm)) bc.uBD = bc.uBDm;
-  else bc.uBD = ttime*bc.uBDa;
-  // uTD
-  if(bc.uTDa == 0) bc.uTD = bc.uTDm;
-  else if(fabs(ttime*bc.uTDa) > fabs(bc.uTDm)) bc.uTD = bc.uTDm;
-  else bc.uTD = ttime*bc.uTDa;
-  // vWD
-  if(bc.vWDa == 0) bc.vWD = bc.vWDm;
-  else if(fabs(ttime*bc.vWDa) > fabs(bc.vWDm)) bc.vWD = bc.vWDm;
-  else bc.vWD = ttime*bc.vWDa;
-  // vED
-  if(bc.vEDa == 0) bc.vED = bc.vEDm;
-  else if(fabs(ttime*bc.vEDa) > fabs(bc.vEDm)) bc.vED = bc.vEDm;
-  else bc.vED = ttime*bc.vEDa;
-  // vSD
-  if(bc.vSDa == 0) bc.vSD = bc.vSDm;
-  else if(fabs(ttime*bc.vSDa) > fabs(bc.vSDm)) bc.vSD = bc.vSDm;
-  else bc.vSD = ttime*bc.vSDa;
-  // vND
-  if(bc.vNDa == 0) bc.vND = bc.vNDm;
-  else if(fabs(ttime*bc.vNDa) > fabs(bc.vNDm)) bc.vND = bc.vNDm;
-  else bc.vND = ttime*bc.vNDa;
-  // vBD
-  if(bc.vBDa == 0) bc.vBD = bc.vBDm;
-  else if(fabs(ttime*bc.vBDa) > fabs(bc.vBDm)) bc.vBD = bc.vBDm;
-  else bc.vBD = ttime*bc.vBDa;
-  // vTD
-  if(bc.vTDa == 0) bc.vTD = bc.vTDm;
-  else if(fabs(ttime*bc.vTDa) > fabs(bc.vTDm)) bc.vTD = bc.vTDm;
-  else bc.vTD = ttime*bc.vTDa;
-  // wWD
-  if(bc.wWDa == 0) bc.wWD = bc.wWDm;
-  else if(fabs(ttime*bc.wWDa) > fabs(bc.wWDm)) bc.wWD = bc.wWDm;
-  else bc.wWD = ttime*bc.wWDa;
-  // wED
-  if(bc.wEDa == 0) bc.wED = bc.wEDm;
-  else if(fabs(ttime*bc.wEDa) > fabs(bc.wEDm)) bc.wED = bc.wEDm;
-  else bc.wED = ttime*bc.wEDa;
-  // wSD
-  if(bc.wSDa == 0) bc.wSD = bc.wSDm;
-  else if(fabs(ttime*bc.wSDa) > fabs(bc.wSDm)) bc.wSD = bc.wSDm;
-  else bc.wSD = ttime*bc.wSDa;
-  // wND
-  if(bc.wNDa == 0) bc.wND = bc.wNDm;
-  else if(fabs(ttime*bc.wNDa) > fabs(bc.wNDm)) bc.wND = bc.wNDm;
-  else bc.wND = ttime*bc.wNDa;
-  // wBD
-  if(bc.wBDa == 0) bc.wBD = bc.wBDm;
-  else if(fabs(ttime*bc.wBDa) > fabs(bc.wBDm)) bc.wBD = bc.wBDm;
-  else bc.wBD = ttime*bc.wBDa;
-  // wTD
-  if(bc.wTDa == 0) bc.wTD = bc.wTDm;
-  else if(fabs(ttime*bc.wTDa) > fabs(bc.wTDm)) bc.wTD = bc.wTDm;
-  else bc.wTD = ttime*bc.wTDa;
+  real delta = ttime - vel_tDelay;
+  if (delta >= 0) { // this works since bc.u*D is initialized to zero
+    // uWD
+    if(bc.uWDa == 0) bc.uWD = bc.uWDm;
+    else if(fabs(delta*bc.uWDa) > fabs(bc.uWDm)) bc.uWD = bc.uWDm;
+    else bc.uWD = delta*bc.uWDa;
+    // uED
+    if(bc.uEDa == 0) bc.uED = bc.uEDm;
+    else if(fabs(delta*bc.uEDa) > fabs(bc.uEDm)) bc.uED = bc.uEDm;
+    else bc.uED = delta*bc.uEDa;
+    // uSD
+    if(bc.uSDa == 0) bc.uSD = bc.uSDm;
+    else if(fabs(delta*bc.uSDa) > fabs(bc.uSDm)) bc.uSD = bc.uSDm;
+    else bc.uSD = delta*bc.uSDa;
+    // uND
+    if(bc.uNDa == 0) bc.uND = bc.uNDm;
+    else if(fabs(delta*bc.uNDa) > fabs(bc.uNDm)) bc.uND = bc.uNDm;
+    else bc.uND = delta*bc.uNDa;
+    // uBD
+    if(bc.uBDa == 0) bc.uBD = bc.uBDm;
+    else if(fabs(delta*bc.uBDa) > fabs(bc.uBDm)) bc.uBD = bc.uBDm;
+    else bc.uBD = delta*bc.uBDa;
+    // uTD
+    if(bc.uTDa == 0) bc.uTD = bc.uTDm;
+    else if(fabs(delta*bc.uTDa) > fabs(bc.uTDm)) bc.uTD = bc.uTDm;
+    else bc.uTD = delta*bc.uTDa;
+    // vWD
+    if(bc.vWDa == 0) bc.vWD = bc.vWDm;
+    else if(fabs(delta*bc.vWDa) > fabs(bc.vWDm)) bc.vWD = bc.vWDm;
+    else bc.vWD = delta*bc.vWDa;
+    // vED
+    if(bc.vEDa == 0) bc.vED = bc.vEDm;
+    else if(fabs(delta*bc.vEDa) > fabs(bc.vEDm)) bc.vED = bc.vEDm;
+    else bc.vED = delta*bc.vEDa;
+    // vSD
+    if(bc.vSDa == 0) bc.vSD = bc.vSDm;
+    else if(fabs(delta*bc.vSDa) > fabs(bc.vSDm)) bc.vSD = bc.vSDm;
+    else bc.vSD = delta*bc.vSDa;
+    // vND
+    if(bc.vNDa == 0) bc.vND = bc.vNDm;
+    else if(fabs(delta*bc.vNDa) > fabs(bc.vNDm)) bc.vND = bc.vNDm;
+    else bc.vND = delta*bc.vNDa;
+    // vBD
+    if(bc.vBDa == 0) bc.vBD = bc.vBDm;
+    else if(fabs(delta*bc.vBDa) > fabs(bc.vBDm)) bc.vBD = bc.vBDm;
+    else bc.vBD = delta*bc.vBDa;
+    // vTD
+    if(bc.vTDa == 0) bc.vTD = bc.vTDm;
+    else if(fabs(delta*bc.vTDa) > fabs(bc.vTDm)) bc.vTD = bc.vTDm;
+    else bc.vTD = delta*bc.vTDa;
+    // wWD
+    if(bc.wWDa == 0) bc.wWD = bc.wWDm;
+    else if(fabs(delta*bc.wWDa) > fabs(bc.wWDm)) bc.wWD = bc.wWDm;
+    else bc.wWD = delta*bc.wWDa;
+    // wED
+    if(bc.wEDa == 0) bc.wED = bc.wEDm;
+    else if(fabs(delta*bc.wEDa) > fabs(bc.wEDm)) bc.wED = bc.wEDm;
+    else bc.wED = delta*bc.wEDa;
+    // wSD
+    if(bc.wSDa == 0) bc.wSD = bc.wSDm;
+    else if(fabs(delta*bc.wSDa) > fabs(bc.wSDm)) bc.wSD = bc.wSDm;
+    else bc.wSD = delta*bc.wSDa;
+    // wND
+    if(bc.wNDa == 0) bc.wND = bc.wNDm;
+    else if(fabs(delta*bc.wNDa) > fabs(bc.wNDm)) bc.wND = bc.wNDm;
+    else bc.wND = delta*bc.wNDa;
+    // wBD
+    if(bc.wBDa == 0) bc.wBD = bc.wBDm;
+    else if(fabs(delta*bc.wBDa) > fabs(bc.wBDm)) bc.wBD = bc.wBDm;
+    else bc.wBD = delta*bc.wBDa;
+    // wTD
+    if(bc.wTDa == 0) bc.wTD = bc.wTDm;
+    else if(fabs(delta*bc.wTDa) > fabs(bc.wTDm)) bc.wTD = bc.wTDm;
+    else bc.wTD = delta*bc.wTDa;
+  }
 }
 
 void out_restart(void)
 {
-  int i, j, k;  // iterators
-
   // create the file
-  char path[FILE_NAME_SIZE];
+  char path[FILE_NAME_SIZE] = "";
   sprintf(path, "%s/input/restart.config", ROOT_DIR);
   FILE *rest = fopen(path, "w");
   if(rest == NULL) {
@@ -2976,217 +3192,85 @@ void out_restart(void)
     exit(EXIT_FAILURE);
   }
 
-  // write current timestep information (uvw0 is previous timestep info)
-  // flow solver data
-  fprintf(rest, "%e %e %e %d %d\n", ttime, dt0, dt, stepnum, rec_paraview_stepnum_out);
+  fwrite(&ttime, sizeof(real), 1, rest);
+  fwrite(&dt0, sizeof(real), 1, rest);
+  fwrite(&dt, sizeof(real), 1, rest);
+  fwrite(&stepnum, sizeof(int), 1, rest);
+  fwrite(&rec_paraview_stepnum_out, sizeof(int), 1, rest);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u0, sizeof(real), Dom.Gfx.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_u, sizeof(real), Dom.Gfx.s3b, rest);
+#endif
+  fwrite(conv0_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(diff_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(conv_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u_star, sizeof(real), Dom.Gfx.s3b, rest);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          v_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v0, sizeof(real), Dom.Gfy.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_v, sizeof(real), Dom.Gfy.s3b, rest);
+#endif
+  fwrite(conv0_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(diff_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(conv_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v_star, sizeof(real), Dom.Gfy.s3b, rest);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w0, sizeof(real), Dom.Gfz.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_w, sizeof(real), Dom.Gfz.s3b, rest);
+#endif
+  fwrite(conv0_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(diff_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(conv_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w_star, sizeof(real), Dom.Gfz.s3b, rest);
 
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-        fprintf(rest, "%e ", p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //######################################################################
-        fprintf(rest, "%e ", numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //######################################################################
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(p, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phi, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(p0, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phase, sizeof(int), Dom.Gcc.s3b, rest);
+  fwrite(phase_shell, sizeof(int), Dom.Gcc.s3b, rest);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%d ", flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(flag_u, sizeof(int), Dom.Gfx.s3b, rest);
+  fwrite(flag_v, sizeof(int), Dom.Gfy.s3b, rest);
+  fwrite(flag_w, sizeof(int), Dom.Gfz.s3b, rest);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%d ", flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(bc_plane_pos, sizeof(real), 9, rest);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%d ", flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(parts, sizeof(part_struct), nparts, rest);
 
-  for(i = 0; i < 9; i++) {
-    fprintf(rest, "%e ", bc_plane_pos[i]);
-  }
-  fprintf(rest, "\n");
+  fwrite(&coeff_stride, sizeof(int), 1, rest);
 
-  for(i = 0; i < nparts; i++) {
-    fprintf(rest, "%e ", parts[i].r);
-    fprintf(rest, "%e ", parts[i].x);
-    fprintf(rest, "%e ", parts[i].y);
-    fprintf(rest, "%e ", parts[i].z);
-    fprintf(rest, "%e ", parts[i].u);
-    fprintf(rest, "%e ", parts[i].v);
-    fprintf(rest, "%e ", parts[i].w);
-    fprintf(rest, "%e ", parts[i].u0);
-    fprintf(rest, "%e ", parts[i].v0);
-    fprintf(rest, "%e ", parts[i].w0);
-    fprintf(rest, "%e ", parts[i].udot);
-    fprintf(rest, "%e ", parts[i].vdot);
-    fprintf(rest, "%e ", parts[i].wdot);
-    fprintf(rest, "%e ", parts[i].axx);
-    fprintf(rest, "%e ", parts[i].axy);
-    fprintf(rest, "%e ", parts[i].axz);
-    fprintf(rest, "%e ", parts[i].ayx);
-    fprintf(rest, "%e ", parts[i].ayy);
-    fprintf(rest, "%e ", parts[i].ayz);
-    fprintf(rest, "%e ", parts[i].azx);
-    fprintf(rest, "%e ", parts[i].azy);
-    fprintf(rest, "%e ", parts[i].azz);
-    fprintf(rest, "%e ", parts[i].ox);
-    fprintf(rest, "%e ", parts[i].oy);
-    fprintf(rest, "%e ", parts[i].oz);
-    fprintf(rest, "%e ", parts[i].ox0);
-    fprintf(rest, "%e ", parts[i].oy0);
-    fprintf(rest, "%e ", parts[i].oz0);
-    fprintf(rest, "%e ", parts[i].oxdot);
-    fprintf(rest, "%e ", parts[i].oydot);
-    fprintf(rest, "%e ", parts[i].ozdot);
-    fprintf(rest, "%e ", parts[i].Fx);
-    fprintf(rest, "%e ", parts[i].Fy);
-    fprintf(rest, "%e ", parts[i].Fz);
-    fprintf(rest, "%e ", parts[i].Lx);
-    fprintf(rest, "%e ", parts[i].Ly);
-    fprintf(rest, "%e ", parts[i].Lz);
-    fprintf(rest, "%e ", parts[i].aFx);
-    fprintf(rest, "%e ", parts[i].aFy);
-    fprintf(rest, "%e ", parts[i].aFz);
-    fprintf(rest, "%e ", parts[i].aLx);
-    fprintf(rest, "%e ", parts[i].aLy);
-    fprintf(rest, "%e ", parts[i].aLz);
-    fprintf(rest, "%e ", parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-      fprintf(rest, "%d ", parts[i].nodes[j]);
-    }
-    fprintf(rest, "%d ", parts[i].order);
-    fprintf(rest, "%e ", parts[i].rs);
-    fprintf(rest, "%d ", parts[i].ncoeff);
-    fprintf(rest, "%e ", parts[i].spring_k);
-    fprintf(rest, "%e ", parts[i].spring_x);
-    fprintf(rest, "%e ", parts[i].spring_y);
-    fprintf(rest, "%e ", parts[i].spring_z);
-    fprintf(rest, "%e ", parts[i].spring_l);
-    fprintf(rest, "%d ", parts[i].translating);
-    fprintf(rest, "%d ", parts[i].rotating);
-    fprintf(rest, "%d ", parts[i].cage.cx);
-    fprintf(rest, "%d ", parts[i].cage.cy);
-    fprintf(rest, "%d ", parts[i].cage.cz);
-    fprintf(rest, "%d ", parts[i].cage.is);
-    fprintf(rest, "%d ", parts[i].cage.ibs);
-    fprintf(rest, "%d ", parts[i].cage.ie);
-    fprintf(rest, "%d ", parts[i].cage.ibe);
-    fprintf(rest, "%d ", parts[i].cage.in);
-    fprintf(rest, "%d ", parts[i].cage.js);
-    fprintf(rest, "%d ", parts[i].cage.jbs);
-    fprintf(rest, "%d ", parts[i].cage.je);
-    fprintf(rest, "%d ", parts[i].cage.jbe);
-    fprintf(rest, "%d ", parts[i].cage.jn);
-    fprintf(rest, "%d ", parts[i].cage.ks);
-    fprintf(rest, "%d ", parts[i].cage.kbs);
-    fprintf(rest, "%d ", parts[i].cage.ke);
-    fprintf(rest, "%d ", parts[i].cage.kbe);
-    fprintf(rest, "%d ", parts[i].cage.kn);
-  }
-  fprintf(rest, "\n");
+  fwrite(pnm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im00, sizeof(real), nparts*coeff_stride, rest);
 
-  fprintf(rest, "%d\n", coeff_stride);
-
-  for(i = 0; i < nparts; i++) {
-    for(j = 0; j < coeff_stride; j++) {
-      fprintf(rest, "%e ", pnm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im00[j + i*coeff_stride]);
-    }
-  }
-
-  fprintf(rest, "\n");
-  fprintf(rest, "%e %e %e %e %e\n", rec_flow_field_ttime_out,
-    rec_paraview_ttime_out, rec_particle_ttime_out, rec_restart_ttime_out,
-    rec_precursor_ttime_out);
-  fprintf(rest, "\n");
-  fprintf(rest, "%e %e %e\n", pid_int, pid_back, gradP.z);
+  fwrite(&rec_flow_field_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_paraview_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_particle_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_restart_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_prec_ttime_out, sizeof(real), 1, rest);
+  fwrite(&pid_int, sizeof(real), 1, rest);
+  fwrite(&pid_back, sizeof(real), 1, rest);
+  fwrite(&gradP.z, sizeof(real), 2, rest);
 
   // close the file
   fclose(rest);
@@ -3194,11 +3278,10 @@ void out_restart(void)
 
 void in_restart(void)
 {
-  int i, j, k;  // iterators
   int fret = 0;
   fret = fret; // prevent compiler warning
   // open configuration file for reading
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
   sprintf(fname, "%s/input/restart.config", ROOT_DIR);
   FILE *infile = fopen(fname, "r");
   if(infile == NULL) {
@@ -3206,371 +3289,85 @@ void in_restart(void)
     exit(EXIT_FAILURE);
   }
 
-  // read domain
-  // flow solver data
-#ifdef DOUBLE
-  fret = fscanf(infile, "%le %le %le %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
-#else
-  fret = fscanf(infile, "%e %e %e %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
+  fret = fread(&ttime, sizeof(real), 1, infile);
+  fret = fread(&dt0, sizeof(real), 1, infile);
+  fret = fread(&dt, sizeof(real), 1, infile);
+  fret = fread(&stepnum, sizeof(int), 1, infile);
+  fret = fread(&rec_paraview_stepnum_out, sizeof(int), 1, infile);
+
+  fret = fread(u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u0, sizeof(real), Dom.Gfx.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_u, sizeof(real), Dom.Gfx.s3b, infile);
 #endif
+  fret = fread(conv0_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(diff_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(conv_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u_star, sizeof(real), Dom.Gfx.s3b, infile);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
+  fret = fread(v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v0, sizeof(real), Dom.Gfy.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_v, sizeof(real), Dom.Gfy.s3b, infile);
 #endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(conv0_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(diff_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(conv_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v_star, sizeof(real), Dom.Gfy.s3b, infile);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v_star[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v_star[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
+  fret = fread(w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w0, sizeof(real), Dom.Gfz.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_w, sizeof(real), Dom.Gfz.s3b, infile);
 #endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(conv0_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(diff_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(conv_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w_star, sizeof(real), Dom.Gfz.s3b, infile);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(p, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phi, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(p0, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phase, sizeof(int), Dom.Gcc.s3b, infile);
+  fret = fread(phase_shell, sizeof(int), Dom.Gcc.s3b, infile);
 
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%le ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-#else
-        fret = fscanf(infile, "%e ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%e ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-#endif
-        fret = fscanf(infile, "%d ", &phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%d ", &phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(flag_u, sizeof(int), Dom.Gfx.s3b, infile);
+  fret = fread(flag_v, sizeof(int), Dom.Gfy.s3b, infile);
+  fret = fread(flag_w, sizeof(int), Dom.Gfz.s3b, infile);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(bc_plane_pos, sizeof(real), 9, infile);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(parts, sizeof(part_struct), nparts, infile);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(&coeff_stride, sizeof(int), 1, infile);
 
-  for(i = 0; i < 9; i++) {
-#ifdef DOUBLE
-    fret = fscanf(infile, "%le ", &bc_plane_pos[i]);
-#else
-    fret = fscanf(infile, "%e ", &bc_plane_pos[i]);
-#endif
-  }
-  fprintf(infile, "\n");
+  fret = fread(pnm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im00, sizeof(real), nparts*coeff_stride, infile);
 
-  for(i = 0; i < nparts; i++) {
-#ifdef DOUBLE
-    fret = fscanf(infile, "%le ", &parts[i].r);
-    fret = fscanf(infile, "%le ", &parts[i].x);
-    fret = fscanf(infile, "%le ", &parts[i].y);
-    fret = fscanf(infile, "%le ", &parts[i].z);
-    fret = fscanf(infile, "%le ", &parts[i].u);
-    fret = fscanf(infile, "%le ", &parts[i].v);
-    fret = fscanf(infile, "%le ", &parts[i].w);
-    fret = fscanf(infile, "%le ", &parts[i].u0);
-    fret = fscanf(infile, "%le ", &parts[i].v0);
-    fret = fscanf(infile, "%le ", &parts[i].w0);
-    fret = fscanf(infile, "%le ", &parts[i].udot);
-    fret = fscanf(infile, "%le ", &parts[i].vdot);
-    fret = fscanf(infile, "%le ", &parts[i].wdot);
-    fret = fscanf(infile, "%le ", &parts[i].axx);
-    fret = fscanf(infile, "%le ", &parts[i].axy);
-    fret = fscanf(infile, "%le ", &parts[i].axz);
-    fret = fscanf(infile, "%le ", &parts[i].ayx);
-    fret = fscanf(infile, "%le ", &parts[i].ayy);
-    fret = fscanf(infile, "%le ", &parts[i].ayz);
-    fret = fscanf(infile, "%le ", &parts[i].azx);
-    fret = fscanf(infile, "%le ", &parts[i].azy);
-    fret = fscanf(infile, "%le ", &parts[i].azz);
-    fret = fscanf(infile, "%le ", &parts[i].ox);
-    fret = fscanf(infile, "%le ", &parts[i].oy);
-    fret = fscanf(infile, "%le ", &parts[i].oz);
-    fret = fscanf(infile, "%le ", &parts[i].ox0);
-    fret = fscanf(infile, "%le ", &parts[i].oy0);
-    fret = fscanf(infile, "%le ", &parts[i].oz0);
-    fret = fscanf(infile, "%le ", &parts[i].oxdot);
-    fret = fscanf(infile, "%le ", &parts[i].oydot);
-    fret = fscanf(infile, "%le ", &parts[i].ozdot);
-    fret = fscanf(infile, "%le ", &parts[i].Fx);
-    fret = fscanf(infile, "%le ", &parts[i].Fy);
-    fret = fscanf(infile, "%le ", &parts[i].Fz);
-    fret = fscanf(infile, "%le ", &parts[i].Lx);
-    fret = fscanf(infile, "%le ", &parts[i].Ly);
-    fret = fscanf(infile, "%le ", &parts[i].Lz);
-    fret = fscanf(infile, "%le ", &parts[i].aFx);
-    fret = fscanf(infile, "%le ", &parts[i].aFy);
-    fret = fscanf(infile, "%le ", &parts[i].aFz);
-    fret = fscanf(infile, "%le ", &parts[i].aLx);
-    fret = fscanf(infile, "%le ", &parts[i].aLy);
-    fret = fscanf(infile, "%le ", &parts[i].aLz);
-    fret = fscanf(infile, "%le ", &parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-    fret = fscanf(infile, "%d ", &parts[i].nodes[j]);
-    }
-    fret = fscanf(infile, "%d ", &parts[i].order);
-    fret = fscanf(infile, "%le ", &parts[i].rs);
-    fret = fscanf(infile, "%d ", &parts[i].ncoeff);
-    fret = fscanf(infile, "%le ", &parts[i].spring_k);
-    fret = fscanf(infile, "%le ", &parts[i].spring_x);
-    fret = fscanf(infile, "%le ", &parts[i].spring_y);
-    fret = fscanf(infile, "%le ", &parts[i].spring_z);
-    fret = fscanf(infile, "%le ", &parts[i].spring_l);
-    fret = fscanf(infile, "%d ", &parts[i].translating);
-    fret = fscanf(infile, "%d ", &parts[i].rotating);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cx);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cy);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cz);
-    fret = fscanf(infile, "%d ", &parts[i].cage.is);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ie);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.in);
-    fret = fscanf(infile, "%d ", &parts[i].cage.js);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.je);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jn);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ks);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ke);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kn);
-#else
-    fret = fscanf(infile, "%e ", &parts[i].r);
-    fret = fscanf(infile, "%e ", &parts[i].x);
-    fret = fscanf(infile, "%e ", &parts[i].y);
-    fret = fscanf(infile, "%e ", &parts[i].z);
-    fret = fscanf(infile, "%e ", &parts[i].u);
-    fret = fscanf(infile, "%e ", &parts[i].v);
-    fret = fscanf(infile, "%e ", &parts[i].w);
-    fret = fscanf(infile, "%e ", &parts[i].u0);
-    fret = fscanf(infile, "%e ", &parts[i].v0);
-    fret = fscanf(infile, "%e ", &parts[i].w0);
-    fret = fscanf(infile, "%e ", &parts[i].udot);
-    fret = fscanf(infile, "%e ", &parts[i].vdot);
-    fret = fscanf(infile, "%e ", &parts[i].wdot);
-    fret = fscanf(infile, "%e ", &parts[i].axx);
-    fret = fscanf(infile, "%e ", &parts[i].axy);
-    fret = fscanf(infile, "%e ", &parts[i].axz);
-    fret = fscanf(infile, "%e ", &parts[i].ayx);
-    fret = fscanf(infile, "%e ", &parts[i].ayy);
-    fret = fscanf(infile, "%e ", &parts[i].ayz);
-    fret = fscanf(infile, "%e ", &parts[i].azx);
-    fret = fscanf(infile, "%e ", &parts[i].azy);
-    fret = fscanf(infile, "%e ", &parts[i].azz);
-    fret = fscanf(infile, "%e ", &parts[i].ox);
-    fret = fscanf(infile, "%e ", &parts[i].oy);
-    fret = fscanf(infile, "%e ", &parts[i].oz);
-    fret = fscanf(infile, "%e ", &parts[i].ox0);
-    fret = fscanf(infile, "%e ", &parts[i].oy0);
-    fret = fscanf(infile, "%e ", &parts[i].oz0);
-    fret = fscanf(infile, "%e ", &parts[i].oxdot);
-    fret = fscanf(infile, "%e ", &parts[i].oydot);
-    fret = fscanf(infile, "%e ", &parts[i].ozdot);
-    fret = fscanf(infile, "%e ", &parts[i].Fx);
-    fret = fscanf(infile, "%e ", &parts[i].Fy);
-    fret = fscanf(infile, "%e ", &parts[i].Fz);
-    fret = fscanf(infile, "%e ", &parts[i].Lx);
-    fret = fscanf(infile, "%e ", &parts[i].Ly);
-    fret = fscanf(infile, "%e ", &parts[i].Lz);
-    fret = fscanf(infile, "%e ", &parts[i].aFx);
-    fret = fscanf(infile, "%e ", &parts[i].aFy);
-    fret = fscanf(infile, "%e ", &parts[i].aFz);
-    fret = fscanf(infile, "%e ", &parts[i].aLx);
-    fret = fscanf(infile, "%e ", &parts[i].aLy);
-    fret = fscanf(infile, "%e ", &parts[i].aLz);
-    fret = fscanf(infile, "%e ", &parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-    fret = fscanf(infile, "%d ", &parts[i].nodes[j]);
-    }
-    fret = fscanf(infile, "%d ", &parts[i].order);
-    fret = fscanf(infile, "%e ", &parts[i].rs);
-    fret = fscanf(infile, "%d ", &parts[i].ncoeff);
-    fret = fscanf(infile, "%e ", &parts[i].spring_k);
-    fret = fscanf(infile, "%e ", &parts[i].spring_x);
-    fret = fscanf(infile, "%e ", &parts[i].spring_y);
-    fret = fscanf(infile, "%e ", &parts[i].spring_z);
-    fret = fscanf(infile, "%e ", &parts[i].spring_l);
-    fret = fscanf(infile, "%d ", &parts[i].translating);
-    fret = fscanf(infile, "%d ", &parts[i].rotating);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cz);
-    fret = fscanf(infile, "%d ", &parts[i].cage.is);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ie);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.in);
-    fret = fscanf(infile, "%d ", &parts[i].cage.js);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.je);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jn);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ks);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ke);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kn);
-#endif
-  }
-  fret = fscanf(infile, "\n");
-
-  fret = fscanf(infile, "%d\n", &coeff_stride);
-
-  for(i = 0; i < nparts; i++) {
-    for(j = 0; j < coeff_stride; j++) {
-#ifdef DOUBLE
-      fret = fscanf(infile, "%le ", &pnm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im00[j + i*coeff_stride]);
-
-#else
-      fret = fscanf(infile, "%e ", &pnm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im00[j + i*coeff_stride]);
-#endif
-    }
-  }
-
-#ifdef DOUBLE
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%le %le %le %le %le\n", &rec_flow_field_ttime_out,
-    &rec_paraview_ttime_out, &rec_particle_ttime_out, &rec_restart_ttime_out,
-    &rec_precursor_ttime_out);
-#else
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%e %e %e %e %e\n", &rec_flow_field_ttime_out,
-    &rec_paraview_ttime_out, &rec_particle_ttime_out, &rec_restart_ttime_out,
-    &rec_precursor_ttime_out);
-#endif
-
-#ifdef DOUBLE
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%le %le %le\n", &pid_int, &pid_back, &gradP.z);
-#else
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%e %e %e\n", &pid_int, &pid_back, &gradP.z);
-#endif
+  fret = fread(&rec_flow_field_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_paraview_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_particle_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_restart_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_prec_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&pid_int, sizeof(real), 1, infile);
+  fret = fread(&pid_back, sizeof(real), 1, infile);
+  fret = fread(&gradP.z, sizeof(real), 1, infile);
 
   // close file
   fclose(infile);
@@ -3578,10 +3375,8 @@ void in_restart(void)
 
 void out_restart_turb(void)
 {
-  int i, j, k;  // iterators
-
   // create the file
-  char path[FILE_NAME_SIZE];
+  char path[FILE_NAME_SIZE] = "";
   sprintf(path, "%s/input/restart_turb.config", ROOT_DIR);
   FILE *rest = fopen(path, "w");
   if(rest == NULL) {
@@ -3589,111 +3384,66 @@ void out_restart_turb(void)
     exit(EXIT_FAILURE);
   }
 
-  // write current timestep information (uvw0 is previous timestep info)
-  // flow solver data
-  fprintf(rest, "%e %e %e %d %d\n", ttime, dt0, dt, stepnum,
-    rec_paraview_stepnum_out);
+  fwrite(&ttime, sizeof(real), 1, rest);
+  fwrite(&dt0, sizeof(real), 1, rest);
+  fwrite(&dt, sizeof(real), 1, rest);
+  fwrite(&stepnum, sizeof(int), 1, rest);
+  fwrite(&rec_paraview_stepnum_out, sizeof(int), 1, rest);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e ",
-          u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u0, sizeof(real), Dom.Gfx.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_u, sizeof(real), Dom.Gfx.s3b, rest);
+#endif
+  fwrite(conv0_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(diff_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(conv_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u_star, sizeof(real), Dom.Gfx.s3b, rest);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e ",
-          v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v0, sizeof(real), Dom.Gfy.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_v, sizeof(real), Dom.Gfy.s3b, rest);
+#endif
+  fwrite(conv0_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(diff_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(conv_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v_star, sizeof(real), Dom.Gfy.s3b, rest);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e ",
-          w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w0, sizeof(real), Dom.Gfz.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_w, sizeof(real), Dom.Gfz.s3b, rest);
+#endif
+  fwrite(conv0_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(diff_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(conv_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w_star, sizeof(real), Dom.Gfz.s3b, rest);
 
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-        fprintf(rest, "%e ", p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(p, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phi, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(p0, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phase, sizeof(int), Dom.Gcc.s3b, rest);
+  fwrite(phase_shell, sizeof(int), Dom.Gcc.s3b, rest);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%d ", flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(flag_u, sizeof(int), Dom.Gfx.s3b, rest);
+  fwrite(flag_v, sizeof(int), Dom.Gfy.s3b, rest);
+  fwrite(flag_w, sizeof(int), Dom.Gfz.s3b, rest);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%d ", flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
+  fwrite(bc_plane_pos, sizeof(real), 9, rest);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%d ", flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(i = 0; i < 9; i++) {
-    fprintf(rest, "%e ", bc_plane_pos[i]);
-  }
-  fprintf(rest, "\n");
-
+  fwrite(&rec_prec_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_prec_flow_field_ttime_out, sizeof(real), 1, rest);
   // close the file
   fclose(rest);
 }
 
 void in_restart_turb(void)
 {
-  int i, j, k;  // iterators
   int fret = 0;
   fret = fret; // prevent compiler warning
   // open configuration file for reading
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
   sprintf(fname, "%s/input/restart_turb.config", ROOT_DIR);
   FILE *infile = fopen(fname, "r");
   if(infile == NULL) {
@@ -3701,144 +3451,56 @@ void in_restart_turb(void)
     exit(EXIT_FAILURE);
   }
 
-  // read domain
-  // flow solver data
-#ifdef DOUBLE
-  fret = fscanf(infile, "%le %le %le %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
-#else
-  fret = fscanf(infile, "%e %e %e %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
+  fret = fread(&ttime, sizeof(real), 1, infile);
+  fret = fread(&dt0, sizeof(real), 1, infile);
+  fret = fread(&dt, sizeof(real), 1, infile);
+  fret = fread(&stepnum, sizeof(int), 1, infile);
+  fret = fread(&rec_paraview_stepnum_out, sizeof(int), 1, infile);
+
+  fret = fread(u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u0, sizeof(real), Dom.Gfx.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_u, sizeof(real), Dom.Gfx.s3b, infile);
 #endif
+  fret = fread(conv0_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(diff_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(conv_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u_star, sizeof(real), Dom.Gfx.s3b, infile);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
+  fret = fread(v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v0, sizeof(real), Dom.Gfy.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_v, sizeof(real), Dom.Gfy.s3b, infile);
 #endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(conv0_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(diff_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(conv_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v_star, sizeof(real), Dom.Gfy.s3b, infile);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
+  fret = fread(w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w0, sizeof(real), Dom.Gfz.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_w, sizeof(real), Dom.Gfz.s3b, infile);
 #endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(conv0_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(diff_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(conv_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w_star, sizeof(real), Dom.Gfz.s3b, infile);
 
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(p, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phi, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(p0, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phase, sizeof(int), Dom.Gcc.s3b, infile);
+  fret = fread(phase_shell, sizeof(int), Dom.Gcc.s3b, infile);
 
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%le ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-#else
-        fret = fscanf(infile, "%e ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%e ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-#endif
-        fret = fscanf(infile, "%d ", &phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%d ", &phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(flag_u, sizeof(int), Dom.Gfx.s3b, infile);
+  fret = fread(flag_v, sizeof(int), Dom.Gfy.s3b, infile);
+  fret = fread(flag_w, sizeof(int), Dom.Gfz.s3b, infile);
 
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
+  fret = fread(bc_plane_pos, sizeof(real), 9, infile);
 
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(i = 0; i < 9; i++) {
-#ifdef DOUBLE
-    fret = fscanf(infile, "%le ", &bc_plane_pos[i]);
-#else
-    fret = fscanf(infile, "%e ", &bc_plane_pos[i]);
-#endif
-  }
-  fprintf(infile, "\n");
-
+  fret = fread(&rec_prec_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_prec_flow_field_ttime_out, sizeof(real), 1, infile);
   // close file
   fclose(infile);
 }

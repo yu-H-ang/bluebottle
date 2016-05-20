@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@
  *  DIV_ST
  * TYPE
  */
-#define DIV_ST 1e-7
+#define DIV_ST 1e-10
 /*
  * PURPOSE
  *  Define a value to use for fudging the value of theta when a division by
@@ -421,6 +421,7 @@ extern dom_struct Dom;
  */
 
 extern real *p0;
+extern real *phi;
 
 /****v* bluebottle/p
  * NAME
@@ -436,6 +437,7 @@ extern real *p;
  */
 
 extern real **_p0;
+extern real **_phi;
 
 /****v* bluebottle/_p
  * NAME
@@ -1371,6 +1373,42 @@ extern real ttime;
  ******
  */
 
+/****v* bluebottle/vel_tDelay
+  * NAME
+  * vel_tDelay
+  * TYPE
+  */
+extern real vel_tDelay;
+/*
+  * PURPOSE
+  *  The time when the dirichlet velocity boundary conditions should be applied
+  ******
+  */
+
+/****v* bluebottle/p_tDelay
+  * NAME
+  * p_tDelay
+  * TYPE
+  */
+extern real p_tDelay;
+/*
+  * PURPOSE
+  *  The time when the applied pressure should be applied
+  ******
+  */
+ 
+/****v* bluebottle/g_tDelay
+  * NAME
+  * g_tDelay
+  * TYPE
+  */
+extern real g_tDelay;
+/*
+  * PURPOSE
+  *  The time when the applied gravity should be applied
+  ******
+  */
+
 /****v* bluebottle/dt
  * NAME
  *  dt
@@ -1524,6 +1562,19 @@ extern int rec_flow_field_stepnum_out;
  ******
  */
 
+/****v* bluebottle/rec_prec_flow_field_stepnum_out
+ * NAME
+ *  rec_prec_flow_field_stepnum_out
+ * TYPE
+ */
+extern int rec_prec_flow_field_stepnum_out;
+/*
+ * PURPOSE
+ *  The output timestep number for the simulation.  The initial configuration
+ *  is given by stepnum = 0.
+ ******
+ */
+
 /****v* bluebottle/rec_paraview_stepnum_out
  * NAME
  *  rec_paraview_stepnum_out
@@ -1537,12 +1588,12 @@ extern int rec_paraview_stepnum_out;
  ******
  */
 
-/****v* bluebottle/rec_precursor_stepnum_out
+/****v* bluebottle/rec_prec_stepnum_out
  * NAME
- *  rec_precursor_stepnum_out
+ *  rec_prec_stepnum_out
  * TYPE
  */
-extern int rec_precursor_stepnum_out;
+extern int rec_prec_stepnum_out;
 /*
  * PURPOSE
  *  The output timestep number for the precursor simulation.  The initial
@@ -1623,6 +1674,73 @@ extern int rec_flow_field_phase;
  ******
  */
 
+/****v* bluebottle/rec_prec_flow_field_dt
+ * NAME
+ *  rec_prec_flow_field_dt
+ * TYPE
+ */
+
+extern real rec_prec_flow_field_dt;
+/*
+ * PURPOSE
+ *  Recorder turbulence flow field output timestep size.
+ ******
+ */
+
+/****v* bluebottle/rec_prec_flow_field_ttime_out
+ * NAME
+ *  rec_prec_flow_field_ttime_out
+ * TYPE
+ */
+extern real rec_prec_flow_field_ttime_out;
+/*
+ * PURPOSE
+ *  Recorder turbulence flow field output time since last output.
+ ******
+ */
+
+/****v* bluebottle/rec_prec_flow_field_vel
+ * NAME
+ *  rec_prec_flow_field_vel
+ * TYPE
+ */
+extern int rec_prec_flow_field_vel;
+/*
+ * PURPOSE
+ *  Recorder turbulence flow field output velocity field boolean.
+ ******
+ */
+
+/****v* bluebottle/rec_prec_flow_field_p
+ * NAME
+ *  rec_prec_flow_field_p
+ * TYPE
+ */
+extern int rec_prec_flow_field_p;
+/*
+ * PURPOSE
+ *  Recorder turbulence flow field output pressure field boolean.
+ ******
+ */
+
+/****v* bluebottle/rec_prec_flow_field_phase
+ * NAME
+ *  rec_prec_flow_field_phase
+ * TYPE
+ */
+extern int rec_prec_flow_field_phase;
+/*
+ * PURPOSE
+ *  Recorder turbulence flow field output phase field boolean.
+ ******
+ */
+
+/****v* bluebottle/rec_paraview_dt
+ * NAME
+ *  rec_paraview_dt
+ * TYPE
+ */
+
 /****v* bluebottle/rec_paraview_dt
  * NAME
  *  rec_paraview_dt
@@ -1647,24 +1765,24 @@ extern real rec_paraview_ttime_out;
  ******
  */
 
-/****v* bluebottle/rec_precursor_dt
+/****v* bluebottle/rec_prec_dt
  * NAME
- *  rec_precursor_dt
+ *  rec_prec_dt
  * TYPE
  */
-extern real rec_precursor_dt;
+extern real rec_prec_dt;
 /*
  * PURPOSE
  *  Recorder ParaView precursor output timestep size.
  ******
  */
 
-/****v* bluebottle/rec_precursor_ttime_out
+/****v* bluebottle/rec_prec_ttime_out
  * NAME
- *  rec_precursor_ttime_out
+ *  rec_prec_ttime_out
  * TYPE
  */
-extern real rec_precursor_ttime_out;
+extern real rec_prec_ttime_out;
 /*
  * PURPOSE
  *  Recorder precursor output time since last output.
@@ -1967,6 +2085,12 @@ typedef struct BC {
   real wTDm;
   real wTD;
   real wTDa;
+  real dsW;
+  real dsE;
+  real dsS;
+  real dsN;
+  real dsB;
+  real dsT;
 } BC;
 /*
  * PURPOSE
@@ -2063,6 +2187,12 @@ typedef struct BC {
  *  * wTDm -- the maximum DIRICHLET boundary condition value
  *  * wTD -- the current DIRICHLET boundary conditon value
  *  * wTDa -- the DIRICHLET boundary condition value acceleration
+ *  * dsW -- the SCREEN boundary condition offset value
+ *  * dsE -- the SCREEN boundary condition offset value
+ *  * dsS -- the SCREEN boundary condition offset value
+ *  * dsN -- the SCREEN boundary condition offset value
+ *  * dsB -- the SCREEN boundary condition offset value
+ *  * dsT -- the SCREEN boundary condition offset value
  ******
  */
 
@@ -2318,6 +2448,20 @@ void cuda_part_BC_p(int dev);
  ******
  */
 
+/****f* bluebottle/cuda_part_p_fill()
+ * NAME
+ *  cuda_part_p_fill()
+ * USAGE
+ */
+void cuda_part_p_fill();
+/*
+ * FUNCTION
+ *  Enforce boundary conditions in pressure-Poisson problem.
+ * ARGUMENTS
+ *  * dev -- the device number
+ ******
+ */
+
 /****f* bluebottle/cuda_solvability()
  * NAME
  *  cuda_solvability()
@@ -2336,6 +2480,7 @@ void cuda_solvability(void);
  * USAGE
  */
 void cuda_dom_BC_p(void);
+void cuda_dom_BC_phi(void);
 /*
  * FUNCTION
  *  Enforce zero normal gradient boundary conditions on projected pressure.
@@ -2665,6 +2810,18 @@ void cuda_move_parts(void);
  ******
  */
 
+/****f* bluebottle/cuda_parts_internal()
+ * NAME
+ *  cuda_parts_internal()
+ * USAGE
+ */
+void cuda_parts_internal(void);
+/*
+ * FUNCTION
+ *  Apply particle solid-body motion to internal velocity nodes.
+ ******
+ */
+
 /****f* bluebottle/cuda_yank_turb_planes()
  * NAME
  *  cuda_yank_turb_planes()
@@ -2694,26 +2851,56 @@ void cuda_collisions(void);
  ******
  */
 
+/****f* bluebottle/seeder_read_input()
+ * NAME
+ *  seeder_read_input()
+ * USAGE
+ */
+void seeder_read_input();
+/*
+  * FUNCTION
+  *   Read parts.config for seeder initialization
+  ******
+  */
+
 /****f* bluebottle/seeder()
  * NAME
  *  seeder()
  * USAGE
  */
-void seeder(int N, real a, real d, real E, real s, int o, int t, int r);
+void seeder(int N, real loa, real a, real aFx, real aFy, real aFz, 
+  real aLx, real aLy, real aLz, real rho, real E, real sigma, real e_dry,
+  real l_rough, int o, real rs_r, real spring_k, real spring_x, real spring_y,
+  real spring_z, real spring_l, int t, int r);
 /*
  * FUNCTION
  *  Randomly seed N particles in the domain. To use this function, run
- *  'bluebottle -s N a d E s o t r', using the arguments as defined below. A new
+ *  'bluebottle -s', using the arguments as defined below. A new
  *  file called part_seeder.config will be created and the main bluebottle
  *  simulation code will not be run. To run a simulation using this input file,
  *  change its name to part.config and run bluebottle normally.
  * ARGUMENTS
  *  * N -- the number of particles
+ *  * loa -- particle interaction compact support length
  *  * a -- the radius of the particles
+ *  * aFx -- particle x forcing
+ *  * aFy -- particle y forcing
+ *  * aFz -- particle z forcing
+ *  * aLx -- particle x angular forcing
+ *  * aLy -- particle y angular forcing
+ *  * aLz -- particle z angular forcing
  *  * d -- the density of the particles (rho)
  *  * E -- the particle Young's modulus
  *  * s -- the particle Poisson ratio (-1 < s <= 0.5)
+ *  * e_dry -- dry coefficient of restitution
+ *  * l_rough -- particle surface roughness
  *  * o -- the order of truncation of the Lamb's solution
+ *  * rs_r -- cage extent ratio
+ *  * spring_k -- particle spring constant
+ *  * spring_x -- particle spring x location
+ *  * spring_y -- particle spring y location
+ *  * spring_z -- particle spring z location
+ *  * spring_l -- particle spring length
  *  * t -- one if translating, zero if not
  *  * r -- one if rotating, zero if not
  ******

@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -1356,7 +1356,7 @@ __global__ void BC_w_T_T(real *w, dom_struct *dom, real *bc);
  * USAGE
  */
 __global__ void project_u(real *u_star, real *p, real rho_f, real dt,
-  real *u, dom_struct *dom, real ddx, int *flag_u);
+  real *u, dom_struct *dom, real ddx, int *flag_u, int *phase);
 /*
  * FUNCTION
  *  Project the intermediate velocity u_star onto a divergence-free space via
@@ -1379,7 +1379,7 @@ __global__ void project_u(real *u_star, real *p, real rho_f, real dt,
  * USAGE
  */
 __global__ void project_v(real *v_star, real *p, real rho_f, real dt,
-  real *v, dom_struct *dom, real ddy, int *flag_v);
+  real *v, dom_struct *dom, real ddy, int *flag_v, int *phase);
 /*
  * FUNCTION
  *  Project the intermediate velocity v_star onto a divergence-free space via
@@ -1402,7 +1402,7 @@ __global__ void project_v(real *v_star, real *p, real rho_f, real dt,
  * USAGE
  */
 __global__ void project_w(real *w_star, real *p, real rho_f, real dt,
-  real *w, dom_struct *dom, real ddz, int *flag_w);
+  real *w, dom_struct *dom, real ddz, int *flag_w, int *phase);
 /*
  * FUNCTION
  *  Project the intermediate velocity w_star onto a divergence-free space via
@@ -1424,13 +1424,13 @@ __global__ void project_w(real *w_star, real *p, real rho_f, real dt,
  *  update_p_laplacian<<<>>>()
  * USAGE
  */
-__global__ void update_p_laplacian(real *Lp, real *p, dom_struct *dom);
+__global__ void update_p_laplacian(real *Lp, real *phi, dom_struct *dom);
 /*
  * FUNCTION
  *  Update the pressure according to Brown, Cortez, and Minion (2000), eq. 74.
  * ARGUMENTS
- *  * Lp -- Laplacian of p
- *  * p -- intermediate pressure given by solution of pressure-Poisson problem
+ *  * Lp -- Laplacian of phi
+ *  * phi -- intermediate pressure given by solution of pressure-Poisson problem
  *  * dom -- the subdomain on which to operate
  ******
  */
@@ -1440,15 +1440,16 @@ __global__ void update_p_laplacian(real *Lp, real *p, dom_struct *dom);
  *  update_p<<<>>>()
  * USAGE
  */
-__global__ void update_p(real *Lp, real *p0, real *p, dom_struct *dom,
-  real nu, real dt);
+__global__ void update_p(real *Lp, real *p0, real *p, real *phi,
+  dom_struct *dom, real nu, real dt, int *phase);
 /*
  * FUNCTION
  *  Update the pressure according to Brown, Cortez, and Minion (2000), eq. 74.
  * ARGUMENTS
  *  * Lp -- Laplacian of p
  *  * p0 -- previous pressure
- *  * p -- intermediate pressure given by solution of pressure-Poisson problem
+ *  * p -- next pressure
+ *  * phi -- intermediate pressure given by solution of pressure-Poisson problem
  *  * dom -- the subdomain on which to operate
  *  * nu -- kinematic viscosity
  ******
@@ -1604,7 +1605,7 @@ __global__ void copy_w_fluid(real *w_noghost, real *w_ghost, int *phase, dom_str
 __global__ void u_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *u_star,
-  dom_struct *dom, real dt0, real dt);
+  dom_struct *dom, real dt0, real dt, int *phase);
 /*
  * FUNCTION
  *  Compute the intermediate velocity field u_star (2nd-order in time).
@@ -1633,7 +1634,7 @@ __global__ void u_star_2(real rho_f, real nu,
 __global__ void v_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *v_star,
-  dom_struct *dom, real dt0, real dt);
+  dom_struct *dom, real dt0, real dt, int *phase);
 /*
  * FUNCTION
  *  Compute the intermediate velocity field v_star (2nd-order in time).
@@ -1662,7 +1663,7 @@ __global__ void v_star_2(real rho_f, real nu,
 __global__ void w_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *w_star,
-  dom_struct *dom, real dt0, real dt);
+  dom_struct *dom, real dt0, real dt, int *phase);
 /*
  * FUNCTION
  *  Compute the intermediate velocity field w_star (2nd-order in time).
@@ -1992,7 +1993,7 @@ __global__ void plane_eps_z_T(real eps, real *w_star, dom_struct *dom);
  * USAGE
  */
 __global__ void move_parts_a(dom_struct *dom, part_struct *parts, int nparts,
-  real dt, real dt0, g_struct g, real rho_f, real ttime);
+  real dt, real dt0, g_struct g, gradP_struct gradP, real rho_f, real ttime);
 /*
  * FUNCTION
  *  Update the particle velocities and move the particles. Part A: does
@@ -2015,7 +2016,7 @@ __global__ void move_parts_a(dom_struct *dom, part_struct *parts, int nparts,
  * USAGE
  */
 __global__ void move_parts_b(dom_struct *dom, part_struct *parts, int nparts,
-  real dt, real dt0, g_struct g, real rho_f, real ttime);
+  real dt, real dt0, g_struct g, gradP_struct gradP, real rho_f, real ttime);
 /*
  * FUNCTION
  *  Update the particle velocities and move the particles. Part B: does
@@ -2094,25 +2095,103 @@ __global__ void collision_init(part_struct *parts, int nparts);
  ******
  */
 
+/****f* cuda_bluebottle_kernel/init<<<>>>()
+  * NAME
+  *   init<<<>>>()
+  * USAGE
+  */
+__global__ void init(int *vector, int N, int val);
+/*
+ * FUNCTION
+ *  fill a general array with a general value
+ * ARGUMENTS
+ *  * vector -- vector to be filled
+ *  * N -- length of array
+ *  * val -- value to initialize with
+ ******
+ */
+
+/****f* cuda_bluebottle_kernel/bin_fill<<<>>>()
+  * NAME
+  *   bin_fill<<<>>>()
+  * USAGE
+  */
+__global__ void bin_fill(int *partInd, int *partBin, int nparts,
+                  part_struct *parts, dom_struct *binDom, BC bc);
+/*
+ * FUNCTION
+ *  fill the partInd and partBin arrays with locations
+ * ARGUMENTS
+ *  * partInd -- corresponding particle index for partBin
+ *  * partBin -- for each particle, give bin
+ *  * nparts -- the number of particles
+ *  * parts -- the device particle array subdomain
+ *  * binDom -- the domain structure contaiing info about bin domain
+ *  * bc -- boundary condition data
+ ******
+ */
+
+/****f* cuda_bluebottle_kernel/bin_partCount<<<>>>()
+  * NAME
+  *   bin_partCount<<<>>>()
+  * USAGE
+  */
+__global__ void bin_partCount(int *binCount, int *binStart, int *binEnd,
+                              dom_struct *binDom, BC bc, int nBins);
+/*
+ * FUNCTION
+ *  counts the number of particles per bin and bin stencil
+ * ARGUMENTS
+ *  * binCount -- number of particles in each bin
+ *  * binStart -- index of (sorted) partBin where each bin starts
+ *  * binEnd -- index of (sorted) partBin where each bin ends
+ *  * binDom -- the domain structure containing info about bin domain
+ *  * bc -- boundary condition data
+ *  * nBins -- the number of bins
+ ******
+ */
+
+/****f* cuda_bluebottle_kernel/bin_start<<<>>>()
+  * NAME
+  *   bin_start<<<>>>()
+  * USAGE
+  */
+__global__ void bin_start(int *binStart, int *binEnd, int *partBin, int nparts);
+/*
+ * FUNCTION
+ *  find the start and end indices of each in the sorted arra
+ * ARGUMENTS
+ *  * binStart -- index of (sorted) partBin where each bin starts
+ *  * binEnd -- index of (sorted) partBin where each bin ends
+ *  * partBin -- for each particle, give bin
+ *  * nparts -- the number of particles
+ ******
+ */
+
 /****f* cuda_bluebottle_kernel/collision_parts<<<>>>()
  * NAME
  *  collision_parts<<<>>>()
  * USAGE
  */
-__global__ void collision_parts(part_struct *parts, int i,
-  dom_struct *dom, real eps, real *forces, real *moments, int nparts, real mu,
-  BC bc);
+__global__ void collision_parts(part_struct *parts, int nparts,
+  dom_struct *dom, real eps, real mu, BC bc, int *binStart, int *binEnd,
+  int *partBin, int *partInd, dom_struct *binDom, int interactionLength);
 /*
  * FUNCTION
  *  Calculate collision forcing between particle i and all other particles.
  * ARGUMENTS
  *  * parts -- the device particle array subdomain
- *  * i -- the particle number to calculate
+ *  * nparts -- the number of particles in the domain
+ *  * dom -- the device domain array
  *  * eps -- magnitude of forcing
- *  * forces -- temporary working array
- *  * moments -- temporary working array
- *  * nparts -- number of particles
  *  * mu -- fluid viscosity
+ *  * bc -- boundary condition data
+ *  * binStart -- index of (sorted) partBin where each bin starts
+ *  * binEnd -- index of (sorted) partBin where each bin ends
+ *  * partBin -- for each particle, give bin
+ *  * partInd -- corresponding particle index for partBin
+ *  * binDom -- the domain structure contaiing info about bin domain
+ *  * interactionLength -- the compact support length for interactions
  ******
  */
 
@@ -2122,7 +2201,8 @@ __global__ void collision_parts(part_struct *parts, int i,
  * USAGE
  */
 __global__ void collision_walls(dom_struct *dom, part_struct *parts,
-  int nparts, BC bc, real eps, real mu);
+  int nparts, BC bc, real eps, real mu, real rho_f, real nu,
+  int interactionLength, real dt);
 /*
  * FUNCTION
  *  Calculate collision forcing between particle i and all other particles.
@@ -2133,6 +2213,8 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
  *  * bc -- boundary condition data
  *  * eps -- magnitude of forcing
  *  * mu -- fluid viscosity
+ *  * interactionLength -- the compact support length for interactions
+ *  * dt -- time step size
  ******
  */
 
@@ -2417,6 +2499,82 @@ __global__ void energy_multiply(real *u_co, real *v_co, real *w_co, real *co,
  *  * v_co -- colocated v-velocity field
  *  * w_co -- colocated w-velocity field
  *  * co -- colocated result field
+ ******
+ */
+
+/****f* bluebottle_kernel/ab_int<<<>>>()
+ * NAME
+ *  ab_int<<<>>>()
+ * TYPE
+ */
+__device__ real ab_int(real dt0, real dt, real f0, real df0, real df);
+/* PURPOSE
+ *  CUDA device kernel to apply time-variable Adams-Bashforth integration.
+ * ARGUMENTS
+ *  * dt0 -- previous time step size
+ *  * dt -- current time step size
+ *  * f0 -- function value at previous time level
+ *  * df0 -- function derivative at previous time level
+ *  * df -- function derivative at current time level
+ * OUTPUT
+ *  * f -- function value at future time level
+ ******
+ */
+
+/****f* bluebottle_kernel/internal_u<<<>>>()
+ * NAME
+ *  internal_u<<<>>>()
+ * TYPE
+ */
+__global__ void internal_u(real *u, part_struct *parts, dom_struct *dom,
+  int *flag_u, int *phase);
+/* PURPOSE
+ *  CUDA device kernel to apply particle solid-body motion to internal
+ *  velocity nodes.
+ * ARGUMENTS
+ *  * u -- device velocity field
+ *  * parts -- device particle struct
+ *  * dom -- device domain information
+ *  * flag_u -- device flag field
+ *  * phase -- device phase mask field
+ ******
+ */
+
+/****f* bluebottle_kernel/internal_v<<<>>>()
+ * NAME
+ *  internal_v<<<>>>()
+ * TYPE
+ */
+__global__ void internal_v(real *v, part_struct *parts, dom_struct *dom,
+  int *flag_v, int *phase);
+/* PURPOSE
+ *  CUDA device kernel to apply particle solid-body motion to internal
+ *  velocity nodes.
+ * ARGUMENTS
+ *  * v -- device velocity field
+ *  * parts -- device particle struct
+ *  * dom -- device domain information
+ *  * flag_v -- device flag field
+ *  * phase -- device phase mask field
+ ******
+ */
+
+/****f* bluebottle_kernel/internal_w<<<>>>()
+ * NAME
+ *  internal_w<<<>>>()
+ * TYPE
+ */
+__global__ void internal_w(real *w, part_struct *parts, dom_struct *dom,
+  int *flag_w, int *phase);
+/* PURPOSE
+ *  CUDA device kernel to apply particle solid-body motion to internal
+ *  velocity nodes.
+ * ARGUMENTS
+ *  * w -- device velocity field
+ *  * parts -- device particle struct
+ *  * dom -- device domain information
+ *  * flag_w -- device flag field
+ *  * phase -- device phase mask field
  ******
  */
 

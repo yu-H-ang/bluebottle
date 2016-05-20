@@ -90,6 +90,21 @@ void Eulerian_read_input(void)
 			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_z0);
 			fret = fscanf(infile, " %lf\n", &BubbleGenerator.BubGen_sigmaZ);
 			fret = fscanf(infile, "BubGen_dia %lf\n", &BubbleGenerator.BubGen_dia);
+		} else if(strcmp(buf, "HYPERBOLICTAN_RANDOM") == 0) {
+			BubbleGenerator.BubGen_type = HYPERBOLICTAN_RANDOM;
+			fret = fscanf(infile, " %lf\n", &BubbleGenerator.BubGen_bubblenumber);
+			fret = fscanf(infile, "(Lx1, Lx2, epsx)");
+			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_Lx1);
+			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_Lx2);
+			fret = fscanf(infile, " %lf\n", &BubbleGenerator.BubGen_epsx);
+			fret = fscanf(infile, "(Ly1, Ly2, epsy)");
+			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_Ly1);
+			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_Ly2);
+			fret = fscanf(infile, " %lf\n", &BubbleGenerator.BubGen_epsy);
+			fret = fscanf(infile, "(z0, sigmaZ)");
+			fret = fscanf(infile, " %lf", &BubbleGenerator.BubGen_z0);
+			fret = fscanf(infile, " %lf\n", &BubbleGenerator.BubGen_sigmaZ);
+			fret = fscanf(infile, "BubGen_dia %lf\n", &BubbleGenerator.BubGen_dia);
 		} else {
 			fprintf(stderr, "Eulerian.config read error.\n");
 			exit(EXIT_FAILURE);
@@ -114,6 +129,21 @@ void Eulerian_read_input(void)
 			fret = fscanf(infile, "BubGen_dia %f\n", &BubbleGenerator.BubGen_dia);
 		} else if(strcmp(buf, "HYPERBOLICTAN") == 0) {
 			BubbleGenerator.BubGen_type = HYPERBOLICTAN;
+			fret = fscanf(infile, " %f\n", &BubbleGenerator.BubGen_bubblenumber);
+			fret = fscanf(infile, "(Lx1, Lx2, epsx)");
+			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_Lx1);
+			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_Lx2);
+			fret = fscanf(infile, " %f\n", &BubbleGenerator.BubGen_epsx);
+			fret = fscanf(infile, "(Ly1, Ly2, epsy)");
+			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_Ly1);
+			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_Ly2);
+			fret = fscanf(infile, " %f\n", &BubbleGenerator.BubGen_epsy);
+			fret = fscanf(infile, "(z0, sigmaZ)");
+			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_z0);
+			fret = fscanf(infile, " %f\n", &BubbleGenerator.BubGen_sigmaZ);
+			fret = fscanf(infile, "BubGen_dia %f\n", &BubbleGenerator.BubGen_dia);
+		} else if(strcmp(buf, "HYPERBOLICTAN_RANDOM") == 0) {
+			BubbleGenerator.BubGen_type = HYPERBOLICTAN_RANDOM;
 			fret = fscanf(infile, " %f\n", &BubbleGenerator.BubGen_bubblenumber);
 			fret = fscanf(infile, "(Lx1, Lx2, epsx)");
 			fret = fscanf(infile, " %f", &BubbleGenerator.BubGen_Lx1);
@@ -425,6 +455,19 @@ void Eulerian_read_input(void)
 	fret = fscanf(infile, "turbA %f\n", &turbA);
 	#endif
 	
+	fret = fscanf(infile, "\n");//==============================================
+	
+	fret = fscanf(infile, "SIMULATION CONTROL\n");
+	fret = fscanf(infile, "quiescent_fluid %s\n", buf);
+	if(strcmp(buf, "ON") == 0) {
+		quiescent_fluid = ON;
+	} else if(strcmp(buf, "OFF") == 0) {
+		quiescent_fluid = OFF;
+	} else {
+		fprintf(stderr, "Eulerian.config read error.\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	fclose(infile);
 }
 
@@ -455,6 +498,8 @@ int Eulerian_init(void)
 	bubmas = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	bubdia = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
+	cpumem += Dom.Gcc.s3b * sizeof(real);
+	ter_cell = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	
 	// initialize UNIFORM number density field
@@ -531,6 +576,11 @@ int Eulerian_init(void)
 		}
 	}
 	
+	// cell-centered terminal velocity field
+	for(k = 0; k < Dom.Gcc.s3b; k++) {
+		ter_cell[k] = 0.;
+	}
+	
 	/*
 	// initialize some values
 	// totalnumden is the sum of number density inside the domain(without ghost cell)
@@ -589,6 +639,20 @@ void Eulerian_show_config()
 		printf(" %f\n", BubbleGenerator.BubGen_sigmaX);
 	} else if(BubbleGenerator.BubGen_type == HYPERBOLICTAN) {
 		printf("HYPERBOLICTAN");
+		printf(" %f\n", BubbleGenerator.BubGen_bubblenumber);
+		printf("(Lx1, Lx2, epsx)");
+		printf(" %f", BubbleGenerator.BubGen_Lx1);
+		printf(" %f", BubbleGenerator.BubGen_Lx2);
+		printf(" %f\n", BubbleGenerator.BubGen_epsx);
+		printf("(Ly1, Ly2, epsy)");
+		printf(" %f", BubbleGenerator.BubGen_Ly1);
+		printf(" %f", BubbleGenerator.BubGen_Ly2);
+		printf(" %f\n", BubbleGenerator.BubGen_epsy);
+		printf("(z0, sigmaZ)");
+		printf(" %f", BubbleGenerator.BubGen_z0);
+		printf(" %f\n",  BubbleGenerator.BubGen_sigmaZ);
+	} else if(BubbleGenerator.BubGen_type == HYPERBOLICTAN_RANDOM) {
+		printf("HYPERBOLICTAN_RANDOM");
 		printf(" %f\n", BubbleGenerator.BubGen_bubblenumber);
 		printf("(Lx1, Lx2, epsx)");
 		printf(" %f", BubbleGenerator.BubGen_Lx1);
@@ -751,6 +815,10 @@ void Eulerian_show_config()
 	printf("TURBULENCE DRIVING CONDITIONS\n");
 	printf("turb_switch %d\n", turb_switch);
 	printf("turbA %f\n", turbA);
+	
+	printf("\n");
+	printf("SIMULATION CONTROL\n");
+	printf("quiescent_fluid %d\n", quiescent_fluid);
 	
 	printf("\n");
 	/*
@@ -1128,7 +1196,6 @@ void cgns_finish_Eulerian(void)
 }
 */
 
-
 int Eulerian_init_parameters(void)
 {
 	int i, j, k, C, CC;  // iterators
@@ -1143,11 +1210,6 @@ int Eulerian_init_parameters(void)
 	// bubble density at different depth
 	bubden = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
-	// numGau is used for a Gaussian number density BC
-	numGau = (real*) malloc(Dom.Gfz.s2b * sizeof(real));
-	cpumem += Dom.Gfz.s2b * sizeof(real);
-	masGau = (real*) malloc(Dom.Gfz.s2b * sizeof(real));
-	cpumem += Dom.Gfz.s2b * sizeof(real);
 	// saturation concentration at different depth
 	concen_sat = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
@@ -1157,125 +1219,14 @@ int Eulerian_init_parameters(void)
 	BGmdot = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
 	cpumem += Dom.Gcc.s3b * sizeof(real);
 	
-	/*
-	// Gaussian BC
-	if(bubble_init_cond == UNIFORM) {
-		// Gasussian number density
-		for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-			for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-				C = i + j * Dom.Gcc.s1b;
-				real xx = Dom.xs+Dom.dx*((real)(i-Dom.Gfz.is)+0.5);
-				real yy = Dom.ys+Dom.dy*((real)(j-Dom.Gfz.js)+0.5);
-				numGau[C] = numdenBC.nBD*exp(-0.5*(pow(xx,2.0)+pow(yy,2.0)));
-			}
-		}
-		// Periodic BC in X and Y
-		for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-			C  = i + Dom.Gfz.jsb    * Dom.Gfz.s1b;
-			CC = i + (Dom.Gfz.je-1) * Dom.Gfz.s1b;
-			numGau[C] = numGau[CC];
-			C  = i + (Dom.Gfz.jeb-1) * Dom.Gfz.s1b;
-			CC = i + Dom.Gfz.js      * Dom.Gfz.s1b;
-			numGau[C] = numGau[CC];
-		}
-		for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-			C  = Dom.Gfz.isb    + j * Dom.Gfz.s1b;
-			CC = (Dom.Gfz.ie-1) + j * Dom.Gfz.s1b;
-			numGau[C] = numGau[CC];
-			C  = (Dom.Gfz.ieb-1) + j * Dom.Gfz.s1b;
-			CC = Dom.Gfz.is      + j * Dom.Gfz.s1b;
-			numGau[C] = numGau[CC];
-		}
-		// Gaussian bubble mass
-		for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-			for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-				C = i + j * Dom.Gcc.s1b;
-				masGau[C] = bubmasBC.nBD / numdenBC.nBD * numGau[C];
-			}
-		}
-	}
-	*/
-	
 	// initialize cell-centered and face-centered bubble density field, 
 	// need to define the gravity direction, note that POSITIVE direction have 
 	// to be the water surface and NEGATIVE direction have to be the bottom.
 	if(gravity_direction == GRAVITY_X) {
-		/*
-		bubden_face = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-		cpumem += Dom.Gfx.s3b * sizeof(real);
 		
-		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb - 1; i++) {
-					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					h = ((real)(Dom.Gcc.ieb - i) - 1.5) * Dom.dx;
-					bubden[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
-				}
-			}
-		}
-		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-					i = Dom.Gcc.ieb - 1;
-					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					bubden[C] = rho_atm;
-			}
-		}
-		for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-			for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-				for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb - 1; i++) {
-					C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
-					h = ((real)(Dom.Gfx.ieb - i) - 2.0) * Dom.dx;
-					bubden_face[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
-				}
-			}
-		}
-		for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-			for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-					i = Dom.Gfx.ieb - 1;
-					C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
-					bubden_face[C] = rho_atm;
-			}
-		}
-		*/
 	}
 	else if(gravity_direction == GRAVITY_Y) {
-		/*
-		bubden_face = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-		cpumem += Dom.Gfy.s3b * sizeof(real);
 		
-		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb - 1; j++) {
-				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					h = ((real)(Dom.Gcc.jeb - j) - 1.5) * Dom.dy;
-					bubden[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
-				}
-			}
-		}
-		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-			for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-				j = Dom.Gcc.jeb - 1;
-				C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-				bubden[C] = rho_atm;
-			}
-		}
-		for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-			for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb - 1; j++) {
-				for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-					C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
-					h = ((real)(Dom.Gfy.ieb - i) - 2.0) * Dom.dy;
-					bubden_face[C] = rho_atm * (1.0 + rho_f * grav_acc * h / pressure_atm);
-				}
-			}
-		}
-		for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-			for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-				j = Dom.Gfy.jeb - 1;
-				C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
-				bubden_face[C] = rho_atm;
-			}
-		}
-		*/
 	}
 	else if(gravity_direction == GRAVITY_Z) {
 		
@@ -1420,11 +1371,76 @@ int Eulerian_init_parameters(void)
 			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
 				for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
 					C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-					BGmdot[C] = PI / 6 * pow(BubbleGenerator.BubGen_dia, 3.0) * bubden[C] * BGndot[C];
+					BGmdot[C] = PI / 6. * pow(BubbleGenerator.BubGen_dia, 3.0) * bubden[C] * BGndot[C];
 				}
 			}
 		}
-	} else {
+	} else if(BubbleGenerator.BubGen_type == HYPERBOLICTAN_RANDOM) {
+		
+		// HYPERBOLICTAN_RANDOM bubble generator used, source terms will be calculated at each time step
+		
+		// set zeros
+		for(C = 0; C < Dom.Gcc.s3b; C++) {
+			BGndot[C] = 0.0;
+			BGmdot[C] = 0.0;
+		}
+		
+		// initialize arrays
+		Ix = (real *)malloc(sizeof(real) * Dom.xn);
+		Iy = (real *)malloc(sizeof(real) * Dom.yn);
+		Iz = (real *)malloc(sizeof(real) * Dom.zn);
+		memset(Ix, 0., Dom.xn);
+		memset(Iy, 0., Dom.yn);
+		memset(Iz, 0., Dom.zn);
+		
+		// calculate the inegration
+		real xx = Dom.xs + 0.5 * Dom.dx;
+		real yy = Dom.ys + 0.5 * Dom.dy;
+		real zz = Dom.zs + 0.5 * Dom.dz;
+		real XX = 0.5*(1+tanh((xx-BubbleGenerator.BubGen_Lx1)/BubbleGenerator.BubGen_epsx));
+		XX = XX * 0.5*(1+tanh((BubbleGenerator.BubGen_Lx2-xx)/BubbleGenerator.BubGen_epsx));
+		real YY = 0.5*(1+tanh((yy-BubbleGenerator.BubGen_Ly1)/BubbleGenerator.BubGen_epsy));
+		YY = YY * 0.5*(1+tanh((BubbleGenerator.BubGen_Ly2-yy)/BubbleGenerator.BubGen_epsy));
+		real ZZ = - pow((zz - BubbleGenerator.BubGen_z0), 2.0) / 2. / pow(BubbleGenerator.BubGen_sigmaZ, 2.0);
+		ZZ = exp(ZZ);
+		Ix[0] = XX * Dom.dx;
+		Iy[0] = YY * Dom.dy;
+		Iz[0] = ZZ * Dom.dz;
+		
+		for(i = 1; i < Dom.xn; i++)	{
+			xx = Dom.xs + Dom.dx * (i + 0.5);
+			XX =      0.5*(1+tanh((xx-BubbleGenerator.BubGen_Lx1)/BubbleGenerator.BubGen_epsx));
+			XX = XX * 0.5*(1+tanh((BubbleGenerator.BubGen_Lx2-xx)/BubbleGenerator.BubGen_epsx));
+			Ix[i] = Ix[i - 1] + XX * Dom.dx;
+		}
+		for(j = 1; j < Dom.yn; j++)	{
+			yy = Dom.ys + Dom.dy * (j + 0.5);
+			YY =      0.5*(1+tanh((yy-BubbleGenerator.BubGen_Ly1)/BubbleGenerator.BubGen_epsy));
+			YY = YY * 0.5*(1+tanh((BubbleGenerator.BubGen_Ly2-yy)/BubbleGenerator.BubGen_epsy));
+			Iy[j] = Iy[j - 1] + YY * Dom.dy;
+		}
+		for(k = 1; k < Dom.zn; k++)	{
+			zz = Dom.zs + Dom.dz * (k + 0.5);
+			ZZ = - pow((zz - BubbleGenerator.BubGen_z0), 2.0) / 2. / pow(BubbleGenerator.BubGen_sigmaZ, 2.0);
+			ZZ = exp(ZZ);
+			Iz[k] = Iz[k - 1] + ZZ * Dom.dz;
+		}
+		
+		// normalization
+		for(i = 0; i < Dom.xn; i++) {
+			Ix[i] = Ix[i] / Ix[Dom.xn - 1];
+		}
+		for(j = 0; j < Dom.yn; j++) {
+			Iy[j] = Iy[j] / Iy[Dom.yn - 1];
+		}
+		for(k = 0; k < Dom.zn; k++) {
+			Iz[k] = Iz[k] / Iz[Dom.zn - 1];
+		}
+		
+		// initialize the random number seed
+		srand(1);
+	}
+	else {
 		fprintf(stderr, "Bubble generator type incorrect.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1432,1165 +1448,66 @@ int Eulerian_init_parameters(void)
 	return EXIT_SUCCESS;
 }
 
-void in_restart_Eulerian(void)
+void turbulence_init_Eulerian(void)
 {
-  int i, j, k;  // iterators
-  int fret = 0;
-  fret = fret; // prevent compiler warning
-  // open configuration file for reading
-  char fname[FILE_NAME_SIZE];
-  sprintf(fname, "%s/input/restart.config", ROOT_DIR);
-  FILE *infile = fopen(fname, "r");
-  if(infile == NULL) {
-    fprintf(stderr, "Could not open file %s\n", fname);
-    exit(EXIT_FAILURE);
-  }
-
-  // read domain
-  // flow solver data
-#ifdef DOUBLE
-  fret = fscanf(infile, "%le %le %le %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
-#else
-  fret = fscanf(infile, "%e %e %e %d %d\n", &ttime, &dt0, &dt, &stepnum,
-    &rec_paraview_stepnum_out);
-#endif
-
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          &u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-#endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v_star[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          &v_star[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-#endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-#ifdef DOUBLE
-        fret = fscanf(infile, "%le %le %le %le %le %le %le ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#else
-        fret = fscanf(infile, "%e %e %e %e %e %e %e ",
-          &w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          &w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-#endif
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-        #ifdef DOUBLE
-        fret = fscanf(infile, "%le ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%le ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        #else
-        fret = fscanf(infile, "%e ", &p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%e ", &p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        #endif
-        fret = fscanf(infile, "%d ", &phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%d ", &phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //######################################################################
-        #ifdef DOUBLE
-        fret = fscanf(infile, "%le ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%le ", &bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%le ", &concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        #else
-        fret = fscanf(infile, "%e ", &numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%e ", &bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fret = fscanf(infile, "%e ", &concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        #endif
-        //######################################################################
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fret = fscanf(infile, "%d ", &flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fret = fscanf(infile, "\n");
-
-  for(i = 0; i < 9; i++) {
-#ifdef DOUBLE
-    fret = fscanf(infile, "%le ", &bc_plane_pos[i]);
-#else
-    fret = fscanf(infile, "%e ", &bc_plane_pos[i]);
-#endif
-  }
-  fprintf(infile, "\n");
-
-  for(i = 0; i < nparts; i++) {
-#ifdef DOUBLE
-    fret = fscanf(infile, "%le ", &parts[i].r);
-    fret = fscanf(infile, "%le ", &parts[i].x);
-    fret = fscanf(infile, "%le ", &parts[i].y);
-    fret = fscanf(infile, "%le ", &parts[i].z);
-    fret = fscanf(infile, "%le ", &parts[i].u);
-    fret = fscanf(infile, "%le ", &parts[i].v);
-    fret = fscanf(infile, "%le ", &parts[i].w);
-    fret = fscanf(infile, "%le ", &parts[i].u0);
-    fret = fscanf(infile, "%le ", &parts[i].v0);
-    fret = fscanf(infile, "%le ", &parts[i].w0);
-    fret = fscanf(infile, "%le ", &parts[i].udot);
-    fret = fscanf(infile, "%le ", &parts[i].vdot);
-    fret = fscanf(infile, "%le ", &parts[i].wdot);
-    fret = fscanf(infile, "%le ", &parts[i].axx);
-    fret = fscanf(infile, "%le ", &parts[i].axy);
-    fret = fscanf(infile, "%le ", &parts[i].axz);
-    fret = fscanf(infile, "%le ", &parts[i].ayx);
-    fret = fscanf(infile, "%le ", &parts[i].ayy);
-    fret = fscanf(infile, "%le ", &parts[i].ayz);
-    fret = fscanf(infile, "%le ", &parts[i].azx);
-    fret = fscanf(infile, "%le ", &parts[i].azy);
-    fret = fscanf(infile, "%le ", &parts[i].azz);
-    fret = fscanf(infile, "%le ", &parts[i].ox);
-    fret = fscanf(infile, "%le ", &parts[i].oy);
-    fret = fscanf(infile, "%le ", &parts[i].oz);
-    fret = fscanf(infile, "%le ", &parts[i].ox0);
-    fret = fscanf(infile, "%le ", &parts[i].oy0);
-    fret = fscanf(infile, "%le ", &parts[i].oz0);
-    fret = fscanf(infile, "%le ", &parts[i].oxdot);
-    fret = fscanf(infile, "%le ", &parts[i].oydot);
-    fret = fscanf(infile, "%le ", &parts[i].ozdot);
-    fret = fscanf(infile, "%le ", &parts[i].Fx);
-    fret = fscanf(infile, "%le ", &parts[i].Fy);
-    fret = fscanf(infile, "%le ", &parts[i].Fz);
-    fret = fscanf(infile, "%le ", &parts[i].Lx);
-    fret = fscanf(infile, "%le ", &parts[i].Ly);
-    fret = fscanf(infile, "%le ", &parts[i].Lz);
-    fret = fscanf(infile, "%le ", &parts[i].aFx);
-    fret = fscanf(infile, "%le ", &parts[i].aFy);
-    fret = fscanf(infile, "%le ", &parts[i].aFz);
-    fret = fscanf(infile, "%le ", &parts[i].aLx);
-    fret = fscanf(infile, "%le ", &parts[i].aLy);
-    fret = fscanf(infile, "%le ", &parts[i].aLz);
-    fret = fscanf(infile, "%le ", &parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-    fret = fscanf(infile, "%d ", &parts[i].nodes[j]);
-    }
-    fret = fscanf(infile, "%d ", &parts[i].order);
-    fret = fscanf(infile, "%le ", &parts[i].rs);
-    fret = fscanf(infile, "%d ", &parts[i].ncoeff);
-    fret = fscanf(infile, "%le ", &parts[i].spring_k);
-    fret = fscanf(infile, "%le ", &parts[i].spring_x);
-    fret = fscanf(infile, "%le ", &parts[i].spring_y);
-    fret = fscanf(infile, "%le ", &parts[i].spring_z);
-    fret = fscanf(infile, "%le ", &parts[i].spring_l);
-    fret = fscanf(infile, "%d ", &parts[i].translating);
-    fret = fscanf(infile, "%d ", &parts[i].rotating);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cx);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cy);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cz);
-    fret = fscanf(infile, "%d ", &parts[i].cage.is);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ie);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.in);
-    fret = fscanf(infile, "%d ", &parts[i].cage.js);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.je);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jn);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ks);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ke);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kn);
-#else
-    fret = fscanf(infile, "%e ", &parts[i].r);
-    fret = fscanf(infile, "%e ", &parts[i].x);
-    fret = fscanf(infile, "%e ", &parts[i].y);
-    fret = fscanf(infile, "%e ", &parts[i].z);
-    fret = fscanf(infile, "%e ", &parts[i].u);
-    fret = fscanf(infile, "%e ", &parts[i].v);
-    fret = fscanf(infile, "%e ", &parts[i].w);
-    fret = fscanf(infile, "%e ", &parts[i].u0);
-    fret = fscanf(infile, "%e ", &parts[i].v0);
-    fret = fscanf(infile, "%e ", &parts[i].w0);
-    fret = fscanf(infile, "%e ", &parts[i].udot);
-    fret = fscanf(infile, "%e ", &parts[i].vdot);
-    fret = fscanf(infile, "%e ", &parts[i].wdot);
-    fret = fscanf(infile, "%e ", &parts[i].axx);
-    fret = fscanf(infile, "%e ", &parts[i].axy);
-    fret = fscanf(infile, "%e ", &parts[i].axz);
-    fret = fscanf(infile, "%e ", &parts[i].ayx);
-    fret = fscanf(infile, "%e ", &parts[i].ayy);
-    fret = fscanf(infile, "%e ", &parts[i].ayz);
-    fret = fscanf(infile, "%e ", &parts[i].azx);
-    fret = fscanf(infile, "%e ", &parts[i].azy);
-    fret = fscanf(infile, "%e ", &parts[i].azz);
-    fret = fscanf(infile, "%e ", &parts[i].ox);
-    fret = fscanf(infile, "%e ", &parts[i].oy);
-    fret = fscanf(infile, "%e ", &parts[i].oz);
-    fret = fscanf(infile, "%e ", &parts[i].ox0);
-    fret = fscanf(infile, "%e ", &parts[i].oy0);
-    fret = fscanf(infile, "%e ", &parts[i].oz0);
-    fret = fscanf(infile, "%e ", &parts[i].oxdot);
-    fret = fscanf(infile, "%e ", &parts[i].oydot);
-    fret = fscanf(infile, "%e ", &parts[i].ozdot);
-    fret = fscanf(infile, "%e ", &parts[i].Fx);
-    fret = fscanf(infile, "%e ", &parts[i].Fy);
-    fret = fscanf(infile, "%e ", &parts[i].Fz);
-    fret = fscanf(infile, "%e ", &parts[i].Lx);
-    fret = fscanf(infile, "%e ", &parts[i].Ly);
-    fret = fscanf(infile, "%e ", &parts[i].Lz);
-    fret = fscanf(infile, "%e ", &parts[i].aFx);
-    fret = fscanf(infile, "%e ", &parts[i].aFy);
-    fret = fscanf(infile, "%e ", &parts[i].aFz);
-    fret = fscanf(infile, "%e ", &parts[i].aLx);
-    fret = fscanf(infile, "%e ", &parts[i].aLy);
-    fret = fscanf(infile, "%e ", &parts[i].aLz);
-    fret = fscanf(infile, "%e ", &parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-    fret = fscanf(infile, "%d ", &parts[i].nodes[j]);
-    }
-    fret = fscanf(infile, "%d ", &parts[i].order);
-    fret = fscanf(infile, "%e ", &parts[i].rs);
-    fret = fscanf(infile, "%d ", &parts[i].ncoeff);
-    fret = fscanf(infile, "%e ", &parts[i].spring_k);
-    fret = fscanf(infile, "%e ", &parts[i].spring_x);
-    fret = fscanf(infile, "%e ", &parts[i].spring_y);
-    fret = fscanf(infile, "%e ", &parts[i].spring_z);
-    fret = fscanf(infile, "%e ", &parts[i].spring_l);
-    fret = fscanf(infile, "%d ", &parts[i].translating);
-    fret = fscanf(infile, "%d ", &parts[i].rotating);
-    fret = fscanf(infile, "%d ", &parts[i].cage.cz);
-    fret = fscanf(infile, "%d ", &parts[i].cage.is);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ie);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ibe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.in);
-    fret = fscanf(infile, "%d ", &parts[i].cage.js);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.je);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.jn);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ks);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbs);
-    fret = fscanf(infile, "%d ", &parts[i].cage.ke);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kbe);
-    fret = fscanf(infile, "%d ", &parts[i].cage.kn);
-#endif
-  }
-  fret = fscanf(infile, "\n");
-
-  fret = fscanf(infile, "%d\n", &coeff_stride);
-
-  for(i = 0; i < nparts; i++) {
-    for(j = 0; j < coeff_stride; j++) {
-#ifdef DOUBLE
-      fret = fscanf(infile, "%le ", &pnm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &pnm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &phinm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%le ", &chinm_im00[j + i*coeff_stride]);
-
-#else
-      fret = fscanf(infile, "%e ", &pnm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &pnm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &phinm_im00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im0[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_re00[j + i*coeff_stride]);
-      fret = fscanf(infile, "%e ", &chinm_im00[j + i*coeff_stride]);
-#endif
-    }
-  }
-
-#ifdef DOUBLE
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%le %le %le %le %le\n", &rec_flow_field_ttime_out,
-    &rec_paraview_ttime_out, &rec_particle_ttime_out, &rec_restart_ttime_out,
-    &rec_precursor_ttime_out);
-#else
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%e %e %e %e %e\n", &rec_flow_field_ttime_out,
-    &rec_paraview_ttime_out, &rec_particle_ttime_out, &rec_restart_ttime_out,
-    &rec_precursor_ttime_out);
-#endif
-
-#ifdef DOUBLE
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%le %le %le\n", &pid_int, &pid_back, &gradP.z);
-#else
-  fret = fscanf(infile, "\n");
-  fret = fscanf(infile, "%e %e %e\n", &pid_int, &pid_back, &gradP.z);
-#endif
-
-  // close file
-  fclose(infile);
-}
-
-void out_restart_Eulerian(void)
-{
-  int i, j, k;  // iterators
-
-  // create the file
-  char path[FILE_NAME_SIZE];
-  sprintf(path, "%s/input/restart.config", ROOT_DIR);
-  FILE *rest = fopen(path, "w");
-  if(rest == NULL) {
-    fprintf(stderr, "Could not open file restart.input.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // write current timestep information (uvw0 is previous timestep info)
-  // flow solver data
-  fprintf(rest, "%e %e %e %d %d\n", ttime, dt0, dt, stepnum, rec_paraview_stepnum_out);
-
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          u0[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff0_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv0_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          diff_u[i+j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          conv_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b],
-          u_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          v0[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff0_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv0_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          diff_v[i+j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          conv_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b],
-          v_star[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%e %e %e %e %e %e %e ",
-          w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          w0[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff0_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv0_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          diff_w[i+j*Dom.Gfz.s1b + k*Dom.Gfz.s2b], 
-          conv_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b],
-          w_star[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
-    for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
-      for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
-        fprintf(rest, "%e ", p[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", p0[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%d ", phase_shell[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //######################################################################
-        fprintf(rest, "%e ", numden[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", bubmas[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        fprintf(rest, "%e ", concen[i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b]);
-        //######################################################################
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
-    for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
-      for(i = Dom.Gfx.isb; i < Dom.Gfx.ieb; i++) {
-        fprintf(rest, "%d ", flag_u[i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gfy.ksb; k < Dom.Gfy.keb; k++) {
-    for(j = Dom.Gfy.jsb; j < Dom.Gfy.jeb; j++) {
-      for(i = Dom.Gfy.isb; i < Dom.Gfy.ieb; i++) {
-        fprintf(rest, "%d ", flag_v[i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-    for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-      for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-        fprintf(rest, "%d ", flag_w[i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b]);
-      }
-    }
-  }
-  fprintf(rest, "\n");
-
-  for(i = 0; i < 9; i++) {
-    fprintf(rest, "%e ", bc_plane_pos[i]);
-  }
-  fprintf(rest, "\n");
-
-  for(i = 0; i < nparts; i++) {
-    fprintf(rest, "%e ", parts[i].r);
-    fprintf(rest, "%e ", parts[i].x);
-    fprintf(rest, "%e ", parts[i].y);
-    fprintf(rest, "%e ", parts[i].z);
-    fprintf(rest, "%e ", parts[i].u);
-    fprintf(rest, "%e ", parts[i].v);
-    fprintf(rest, "%e ", parts[i].w);
-    fprintf(rest, "%e ", parts[i].u0);
-    fprintf(rest, "%e ", parts[i].v0);
-    fprintf(rest, "%e ", parts[i].w0);
-    fprintf(rest, "%e ", parts[i].udot);
-    fprintf(rest, "%e ", parts[i].vdot);
-    fprintf(rest, "%e ", parts[i].wdot);
-    fprintf(rest, "%e ", parts[i].axx);
-    fprintf(rest, "%e ", parts[i].axy);
-    fprintf(rest, "%e ", parts[i].axz);
-    fprintf(rest, "%e ", parts[i].ayx);
-    fprintf(rest, "%e ", parts[i].ayy);
-    fprintf(rest, "%e ", parts[i].ayz);
-    fprintf(rest, "%e ", parts[i].azx);
-    fprintf(rest, "%e ", parts[i].azy);
-    fprintf(rest, "%e ", parts[i].azz);
-    fprintf(rest, "%e ", parts[i].ox);
-    fprintf(rest, "%e ", parts[i].oy);
-    fprintf(rest, "%e ", parts[i].oz);
-    fprintf(rest, "%e ", parts[i].ox0);
-    fprintf(rest, "%e ", parts[i].oy0);
-    fprintf(rest, "%e ", parts[i].oz0);
-    fprintf(rest, "%e ", parts[i].oxdot);
-    fprintf(rest, "%e ", parts[i].oydot);
-    fprintf(rest, "%e ", parts[i].ozdot);
-    fprintf(rest, "%e ", parts[i].Fx);
-    fprintf(rest, "%e ", parts[i].Fy);
-    fprintf(rest, "%e ", parts[i].Fz);
-    fprintf(rest, "%e ", parts[i].Lx);
-    fprintf(rest, "%e ", parts[i].Ly);
-    fprintf(rest, "%e ", parts[i].Lz);
-    fprintf(rest, "%e ", parts[i].aFx);
-    fprintf(rest, "%e ", parts[i].aFy);
-    fprintf(rest, "%e ", parts[i].aFz);
-    fprintf(rest, "%e ", parts[i].aLx);
-    fprintf(rest, "%e ", parts[i].aLy);
-    fprintf(rest, "%e ", parts[i].aLz);
-    fprintf(rest, "%e ", parts[i].rho);
-    for(j = 0; j<NNODES; j++){    
-      fprintf(rest, "%d ", parts[i].nodes[j]);
-    }
-    fprintf(rest, "%d ", parts[i].order);
-    fprintf(rest, "%e ", parts[i].rs);
-    fprintf(rest, "%d ", parts[i].ncoeff);
-    fprintf(rest, "%e ", parts[i].spring_k);
-    fprintf(rest, "%e ", parts[i].spring_x);
-    fprintf(rest, "%e ", parts[i].spring_y);
-    fprintf(rest, "%e ", parts[i].spring_z);
-    fprintf(rest, "%e ", parts[i].spring_l);
-    fprintf(rest, "%d ", parts[i].translating);
-    fprintf(rest, "%d ", parts[i].rotating);
-    fprintf(rest, "%d ", parts[i].cage.cx);
-    fprintf(rest, "%d ", parts[i].cage.cy);
-    fprintf(rest, "%d ", parts[i].cage.cz);
-    fprintf(rest, "%d ", parts[i].cage.is);
-    fprintf(rest, "%d ", parts[i].cage.ibs);
-    fprintf(rest, "%d ", parts[i].cage.ie);
-    fprintf(rest, "%d ", parts[i].cage.ibe);
-    fprintf(rest, "%d ", parts[i].cage.in);
-    fprintf(rest, "%d ", parts[i].cage.js);
-    fprintf(rest, "%d ", parts[i].cage.jbs);
-    fprintf(rest, "%d ", parts[i].cage.je);
-    fprintf(rest, "%d ", parts[i].cage.jbe);
-    fprintf(rest, "%d ", parts[i].cage.jn);
-    fprintf(rest, "%d ", parts[i].cage.ks);
-    fprintf(rest, "%d ", parts[i].cage.kbs);
-    fprintf(rest, "%d ", parts[i].cage.ke);
-    fprintf(rest, "%d ", parts[i].cage.kbe);
-    fprintf(rest, "%d ", parts[i].cage.kn);
-  }
-  fprintf(rest, "\n");
-
-  fprintf(rest, "%d\n", coeff_stride);
-
-  for(i = 0; i < nparts; i++) {
-    for(j = 0; j < coeff_stride; j++) {
-      fprintf(rest, "%e ", pnm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", pnm_im00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", phinm_im00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im0[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_re00[j + i*coeff_stride]);
-      fprintf(rest, "%e ", chinm_im00[j + i*coeff_stride]);
-    }
-  }
-
-  fprintf(rest, "\n");
-  fprintf(rest, "%e %e %e %e %e\n", rec_flow_field_ttime_out,
-    rec_paraview_ttime_out, rec_particle_ttime_out, rec_restart_ttime_out,
-    rec_precursor_ttime_out);
-  fprintf(rest, "\n");
-  fprintf(rest, "%e %e %e\n", pid_int, pid_back, gradP.z);
-
-  // close the file
-  fclose(rest);
-}
-
-
-int domain_init_Eulerian(void)
-{
-  int i, j, k;    // iterator
-  int C, W, E, S, N, B, T;
-  real tmp;
-
-  // make sure there are enough GPU devices in the given range
-  if(nsubdom > dev_end - dev_start + 1) {
-    return EXIT_FAILURE;
-  }
-
-  // calculate domain sizes
-  Dom.xl = Dom.xe - Dom.xs;
-  Dom.yl = Dom.ye - Dom.ys;
-  Dom.zl = Dom.ze - Dom.zs;
-
-  // calculate cell sizes
-  Dom.dx = Dom.xl / Dom.xn;
-  Dom.dy = Dom.yl / Dom.yn;
-  Dom.dz = Dom.zl / Dom.zn;
-
-  // set up grids
-  // Gcc
-  Dom.Gcc.is = DOM_BUF;
-  Dom.Gcc.isb = Dom.Gcc.is - DOM_BUF;
-  Dom.Gcc.in = Dom.xn;
-  Dom.Gcc.inb = Dom.Gcc.in + 2 * DOM_BUF;
-  Dom.Gcc.ie = Dom.Gcc.is + Dom.Gcc.in;
-  Dom.Gcc.ieb = Dom.Gcc.ie + DOM_BUF;
-
-  Dom.Gcc.js = DOM_BUF;
-  Dom.Gcc.jsb = Dom.Gcc.js - DOM_BUF;
-  Dom.Gcc.jn = Dom.yn;
-  Dom.Gcc.jnb = Dom.Gcc.jn + 2 * DOM_BUF;
-  Dom.Gcc.je = Dom.Gcc.js + Dom.Gcc.jn;
-  Dom.Gcc.jeb = Dom.Gcc.je + DOM_BUF;
-
-  Dom.Gcc.ks = DOM_BUF;
-  Dom.Gcc.ksb = Dom.Gcc.ks - DOM_BUF;
-  Dom.Gcc.kn = Dom.zn;
-  Dom.Gcc.knb = Dom.Gcc.kn + 2 * DOM_BUF;
-  Dom.Gcc.ke = DOM_BUF + Dom.Gcc.kn;
-  Dom.Gcc.keb = Dom.Gcc.ke + DOM_BUF;
-
-  Dom.Gcc.s1 = Dom.Gcc.in;
-  Dom.Gcc.s2 = Dom.Gcc.s1 * Dom.Gcc.jn;
-  Dom.Gcc.s3 = Dom.Gcc.s2 * Dom.Gcc.kn;
-  Dom.Gcc.s1b = Dom.Gcc.inb;
-  Dom.Gcc.s2b = Dom.Gcc.s1b * Dom.Gcc.jnb;
-  Dom.Gcc.s3b = Dom.Gcc.s2b * Dom.Gcc.knb;
-
-  // Gfx
-  Dom.Gfx.is = DOM_BUF;
-  Dom.Gfx.isb = Dom.Gfx.is - DOM_BUF;
-  Dom.Gfx.in = Dom.xn + 1;
-  Dom.Gfx.inb = Dom.Gfx.in + 2 * DOM_BUF;
-  Dom.Gfx.ie = Dom.Gfx.is + Dom.Gfx.in;
-  Dom.Gfx.ieb = Dom.Gfx.ie + DOM_BUF;
-
-  Dom.Gfx.js = DOM_BUF;
-  Dom.Gfx.jsb = Dom.Gfx.js - DOM_BUF;
-  Dom.Gfx.jn = Dom.yn;
-  Dom.Gfx.jnb = Dom.Gfx.jn + 2 * DOM_BUF;
-  Dom.Gfx.je = Dom.Gfx.js + Dom.Gfx.jn;
-  Dom.Gfx.jeb = Dom.Gfx.je + DOM_BUF;
-
-  Dom.Gfx.ks = DOM_BUF;
-  Dom.Gfx.ksb = Dom.Gfx.ks - DOM_BUF;
-  Dom.Gfx.kn = Dom.zn;
-  Dom.Gfx.knb = Dom.Gfx.kn + 2 * DOM_BUF;
-  Dom.Gfx.ke = Dom.Gfx.ks + Dom.Gfx.kn;
-  Dom.Gfx.keb = Dom.Gfx.ke + DOM_BUF;
-
-  Dom.Gfx.s1 = Dom.Gfx.in;
-  Dom.Gfx.s2 = Dom.Gfx.s1 * Dom.Gfx.jn;
-  Dom.Gfx.s3 = Dom.Gfx.s2 * Dom.Gfx.kn;
-  Dom.Gfx.s1b = Dom.Gfx.inb;
-  Dom.Gfx.s2b = Dom.Gfx.s1b * Dom.Gfx.jnb;
-  Dom.Gfx.s3b = Dom.Gfx.s2b * Dom.Gfx.knb;
-
-  // Gfy
-  Dom.Gfy.is = DOM_BUF;
-  Dom.Gfy.isb = Dom.Gfy.is - DOM_BUF;
-  Dom.Gfy.in = Dom.xn;
-  Dom.Gfy.inb = Dom.Gfy.in + 2 * DOM_BUF;
-  Dom.Gfy.ie = Dom.Gfy.is + Dom.Gfy.in;
-  Dom.Gfy.ieb = Dom.Gfy.ie + DOM_BUF;
-
-  Dom.Gfy.js = DOM_BUF;
-  Dom.Gfy.jsb = Dom.Gfy.js - DOM_BUF;
-  Dom.Gfy.jn = Dom.yn + 1;
-  Dom.Gfy.jnb = Dom.Gfy.jn + 2 * DOM_BUF;
-  Dom.Gfy.je = Dom.Gfy.js + Dom.Gfy.jn;
-  Dom.Gfy.jeb = Dom.Gfy.je + DOM_BUF;
-
-  Dom.Gfy.ks = DOM_BUF;
-  Dom.Gfy.ksb = Dom.Gfy.ks - DOM_BUF;
-  Dom.Gfy.kn = Dom.zn;
-  Dom.Gfy.knb = Dom.Gfy.kn + 2 * DOM_BUF;
-  Dom.Gfy.ke = Dom.Gfy.ks + Dom.Gfy.kn;
-  Dom.Gfy.keb = Dom.Gfy.ke + DOM_BUF;
-
-  Dom.Gfy.s1 = Dom.Gfy.in;
-  Dom.Gfy.s2 = Dom.Gfy.s1 * Dom.Gfy.jn;
-  Dom.Gfy.s3 = Dom.Gfy.s2 * Dom.Gfy.kn;
-  Dom.Gfy.s1b = Dom.Gfy.inb;
-  Dom.Gfy.s2b = Dom.Gfy.s1b * Dom.Gfy.jnb;
-  Dom.Gfy.s3b = Dom.Gfy.s2b * Dom.Gfy.knb;
-
-  // Gfz
-  Dom.Gfz.is = DOM_BUF;
-  Dom.Gfz.isb = Dom.Gfz.is - DOM_BUF;
-  Dom.Gfz.in = Dom.xn;
-  Dom.Gfz.inb = Dom.Gfz.in + 2 * DOM_BUF;
-  Dom.Gfz.ie = Dom.Gfz.is + Dom.Gfz.in;
-  Dom.Gfz.ieb = Dom.Gfz.ie + DOM_BUF;
-
-  Dom.Gfz.js = DOM_BUF;
-  Dom.Gfz.jsb = Dom.Gfz.js - DOM_BUF;
-  Dom.Gfz.jn = Dom.yn;
-  Dom.Gfz.jnb = Dom.Gfz.jn + 2 * DOM_BUF;
-  Dom.Gfz.je = Dom.Gfz.js + Dom.Gfz.jn;
-  Dom.Gfz.jeb = Dom.Gfz.je + DOM_BUF;
-
-  Dom.Gfz.ks = DOM_BUF;
-  Dom.Gfz.ksb = Dom.Gfz.ks - DOM_BUF;
-  Dom.Gfz.kn = Dom.zn + 1;
-  Dom.Gfz.knb = Dom.Gfz.kn + 2 * DOM_BUF;
-  Dom.Gfz.ke = Dom.Gfz.ks + Dom.Gfz.kn;
-  Dom.Gfz.keb = Dom.Gfz.ke + DOM_BUF;
-
-  Dom.Gfz.s1 = Dom.Gfz.in;
-  Dom.Gfz.s2 = Dom.Gfz.s1 * Dom.Gfz.jn;
-  Dom.Gfz.s3 = Dom.Gfz.s2 * Dom.Gfz.kn;
-  Dom.Gfz.s1b = Dom.Gfz.inb;
-  Dom.Gfz.s2b = Dom.Gfz.s1b * Dom.Gfz.jnb;
-  Dom.Gfz.s3b = Dom.Gfz.s2b * Dom.Gfz.knb;
-
-  // initialize subdomains
-  for(i = 0; i < nsubdom; i++) {
-    dom[i].xl = dom[i].xe - dom[i].xs;
-    dom[i].yl = dom[i].ye - dom[i].ys;
-    dom[i].zl = dom[i].ze - dom[i].zs;
-    dom[i].dx = dom[i].xl / dom[i].xn;
-    dom[i].dy = dom[i].yl / dom[i].yn;
-    dom[i].dz = dom[i].zl / dom[i].zn;
-
-    // TODO: this algorithm will fail if subdomains are not numbered in
-    // increasing order.  This will need to be fixed before going to a machine
-    // with more than two GPU's.
-    // Gcc
-    if(dom[i].W > -1)
-      dom[i].Gcc.is = dom[dom[i].W].Gcc.ie;
-    else
-      dom[i].Gcc.is = DOM_BUF;
-    dom[i].Gcc.isb = dom[i].Gcc.is - DOM_BUF;
-    dom[i].Gcc.in = dom[i].xn;
-    dom[i].Gcc.inb = dom[i].Gcc.in + 2 * DOM_BUF;
-    dom[i].Gcc.ie = dom[i].Gcc.is + dom[i].Gcc.in;
-    dom[i].Gcc.ieb = dom[i].Gcc.ie + DOM_BUF;
-
-    if(dom[i].S > -1)
-      dom[i].Gcc.js = dom[dom[i].S].Gcc.je;
-    else
-      dom[i].Gcc.js = DOM_BUF;
-    dom[i].Gcc.jsb = dom[i].Gcc.js - DOM_BUF;
-    dom[i].Gcc.jn = dom[i].yn;
-    dom[i].Gcc.jnb = dom[i].Gcc.jn + 2 * DOM_BUF;
-    dom[i].Gcc.je = dom[i].Gcc.js + dom[i].Gcc.jn;
-    dom[i].Gcc.jeb = dom[i].Gcc.je + DOM_BUF;
-
-    if(dom[i].B > -1)
-      dom[i].Gcc.ks = dom[dom[i].B].Gcc.ke;
-    else
-      dom[i].Gcc.ks = DOM_BUF;
-    dom[i].Gcc.ksb = dom[i].Gcc.ks - DOM_BUF;
-    dom[i].Gcc.kn = dom[i].zn;
-    dom[i].Gcc.knb = dom[i].Gcc.kn + 2 * DOM_BUF;
-    dom[i].Gcc.ke = DOM_BUF + dom[i].Gcc.kn;
-    dom[i].Gcc.keb = dom[i].Gcc.ke + DOM_BUF;
-
-    dom[i].Gcc.s1 = dom[i].Gcc.in;
-    dom[i].Gcc.s2 = dom[i].Gcc.s1 * dom[i].Gcc.jn;
-    dom[i].Gcc.s3 = dom[i].Gcc.s2 * dom[i].Gcc.kn;
-    dom[i].Gcc.s1b = dom[i].Gcc.inb;
-    dom[i].Gcc.s2b = dom[i].Gcc.s1b * dom[i].Gcc.jnb;
-    dom[i].Gcc.s3b = dom[i].Gcc.s2b * dom[i].Gcc.knb;
-
-    dom[i].Gcc._is = DOM_BUF;
-    dom[i].Gcc._isb = dom[i].Gcc._is - DOM_BUF;
-    dom[i].Gcc._in = dom[i].xn;
-    dom[i].Gcc._inb = dom[i].Gcc._in + 2 * DOM_BUF;
-    dom[i].Gcc._ie = dom[i].Gcc._is + dom[i].Gcc._in;
-    dom[i].Gcc._ieb = dom[i].Gcc._ie + DOM_BUF;
-
-    dom[i].Gcc._js = DOM_BUF;
-    dom[i].Gcc._jsb = dom[i].Gcc._js - DOM_BUF;
-    dom[i].Gcc._jn = dom[i].yn;
-    dom[i].Gcc._jnb = dom[i].Gcc._jn + 2 * DOM_BUF;
-    dom[i].Gcc._je = dom[i].Gcc._js + dom[i].Gcc._jn;
-    dom[i].Gcc._jeb = dom[i].Gcc._je + DOM_BUF;
-
-    dom[i].Gcc._ks = DOM_BUF;
-    dom[i].Gcc._ksb = dom[i].Gcc._ks - DOM_BUF;
-    dom[i].Gcc._kn = dom[i].zn;
-    dom[i].Gcc._knb = dom[i].Gcc._kn + 2 * DOM_BUF;
-    dom[i].Gcc._ke = dom[i].Gcc._ks + dom[i].Gcc._kn;
-    dom[i].Gcc._keb = dom[i].Gcc._ke + DOM_BUF;
-
-    dom[i].Gcc._s1 = dom[i].Gcc._in;
-    dom[i].Gcc._s2 = dom[i].Gcc._s1 * dom[i].Gcc._jn;
-    dom[i].Gcc._s3 = dom[i].Gcc._s2 * dom[i].Gcc._kn;
-    dom[i].Gcc._s1b = dom[i].Gcc._inb;
-    dom[i].Gcc._s2b = dom[i].Gcc._s1b * dom[i].Gcc._jnb;
-    dom[i].Gcc._s3b = dom[i].Gcc._s2b * dom[i].Gcc._knb;
-
-    // Gfx
-    if(dom[i].W > -1)
-      dom[i].Gfx.is = dom[dom[i].W].Gfx.ie - 1;
-    else
-      dom[i].Gfx.is = DOM_BUF;
-    dom[i].Gfx.isb = dom[i].Gfx.is - DOM_BUF;
-    dom[i].Gfx.in = dom[i].xn + 1;
-    dom[i].Gfx.inb = dom[i].Gfx.in + 2 * DOM_BUF;
-    dom[i].Gfx.ie = dom[i].Gfx.is + dom[i].Gfx.in;
-    dom[i].Gfx.ieb = dom[i].Gfx.ie + DOM_BUF;
-
-    if(dom[i].S > -1)
-      dom[i].Gfx.js = dom[dom[i].S].Gfx.je - 1;
-    else
-      dom[i].Gfx.js = DOM_BUF;
-    dom[i].Gfx.jsb = dom[i].Gfx.js - DOM_BUF;
-    dom[i].Gfx.jn = dom[i].yn;
-    dom[i].Gfx.jnb = dom[i].Gfx.jn + 2 * DOM_BUF;
-    dom[i].Gfx.je = dom[i].Gfx.js + dom[i].Gfx.jn;
-    dom[i].Gfx.jeb = dom[i].Gfx.je + DOM_BUF;
-
-    if(dom[i].B > -1)
-      dom[i].Gfx.ks = dom[dom[i].B].Gfx.ke - 1;
-    else
-      dom[i].Gfx.ks = DOM_BUF;
-    dom[i].Gfx.ksb = dom[i].Gfx.ks - DOM_BUF;
-    dom[i].Gfx.kn = dom[i].zn;
-    dom[i].Gfx.knb = dom[i].Gfx.kn + 2 * DOM_BUF;
-    dom[i].Gfx.ke = dom[i].Gfx.ks + dom[i].Gfx.kn;
-    dom[i].Gfx.keb = dom[i].Gfx.ke + DOM_BUF;
-
-    dom[i].Gfx.s1 = dom[i].Gfx.in;
-    dom[i].Gfx.s2 = dom[i].Gfx.s1 * dom[i].Gfx.jn;
-    dom[i].Gfx.s3 = dom[i].Gfx.s2 * dom[i].Gfx.kn;
-    dom[i].Gfx.s1b = dom[i].Gfx.inb;
-    dom[i].Gfx.s2b = dom[i].Gfx.s1b * dom[i].Gfx.jnb;
-    dom[i].Gfx.s3b = dom[i].Gfx.s2b * dom[i].Gfx.knb;
-
-    dom[i].Gfx._is = DOM_BUF;
-    dom[i].Gfx._isb = dom[i].Gfx._is - DOM_BUF;
-    dom[i].Gfx._in = dom[i].xn + 1;
-    dom[i].Gfx._inb = dom[i].Gfx._in + 2 * DOM_BUF;
-    dom[i].Gfx._ie = dom[i].Gfx._is + dom[i].Gfx._in;
-    dom[i].Gfx._ieb = dom[i].Gfx._ie + DOM_BUF;
-
-    dom[i].Gfx._js = DOM_BUF;
-    dom[i].Gfx._jsb = dom[i].Gfx._js - DOM_BUF;
-    dom[i].Gfx._jn = dom[i].yn;
-    dom[i].Gfx._jnb = dom[i].Gfx._jn + 2 * DOM_BUF;
-    dom[i].Gfx._je = dom[i].Gfx._js + dom[i].Gfx._jn;
-    dom[i].Gfx._jeb = dom[i].Gfx._je + DOM_BUF;
-
-    dom[i].Gfx._ks = DOM_BUF;
-    dom[i].Gfx._ksb = dom[i].Gfx._ks - DOM_BUF;
-    dom[i].Gfx._kn = dom[i].zn;
-    dom[i].Gfx._knb = dom[i].Gfx._kn + 2 * DOM_BUF;
-    dom[i].Gfx._ke = dom[i].Gfx._ks + dom[i].Gfx._kn;
-    dom[i].Gfx._keb = dom[i].Gfx._ke + DOM_BUF;
-
-    dom[i].Gfx._s1 = dom[i].Gfx._in;
-    dom[i].Gfx._s2 = dom[i].Gfx._s1 * dom[i].Gfx._jn;
-    dom[i].Gfx._s3 = dom[i].Gfx._s2 * dom[i].Gfx._kn;
-    dom[i].Gfx._s1b = dom[i].Gfx._inb;
-    dom[i].Gfx._s2b = dom[i].Gfx._s1b * dom[i].Gfx._jnb;
-    dom[i].Gfx._s3b = dom[i].Gfx._s2b * dom[i].Gfx._knb;
-
-    // Gfy
-    if(dom[i].W > -1)
-      dom[i].Gfy.is = dom[dom[i].W].Gfy.ie;
-    else
-      dom[i].Gfy.is = DOM_BUF;
-    dom[i].Gfy.isb = dom[i].Gfy.is - DOM_BUF;
-    dom[i].Gfy.in = dom[i].xn;
-    dom[i].Gfy.inb = dom[i].Gfy.in + 2 * DOM_BUF;
-    dom[i].Gfy.ie = dom[i].Gfy.is + dom[i].Gfy.in;
-    dom[i].Gfy.ieb = dom[i].Gfy.ie + DOM_BUF;
-
-    if(dom[i].S > -1)
-      dom[i].Gfy.js = dom[dom[i].S].Gfy.je;
-    else
-      dom[i].Gfy.js = DOM_BUF;
-    dom[i].Gfy.jsb = dom[i].Gfy.js - DOM_BUF;
-    dom[i].Gfy.jn = dom[i].yn + 1;
-    dom[i].Gfy.jnb = dom[i].Gfy.jn + 2 * DOM_BUF;
-    dom[i].Gfy.je = dom[i].Gfy.js + dom[i].Gfy.jn;
-    dom[i].Gfy.jeb = dom[i].Gfy.je + DOM_BUF;
-
-    if(dom[i].B > -1)
-      dom[i].Gfy.ks = dom[dom[i].B].Gfy.ke;
-    else
-      dom[i].Gfy.ks = DOM_BUF;
-    dom[i].Gfy.ksb = dom[i].Gfy.ks - DOM_BUF;
-    dom[i].Gfy.kn = dom[i].zn;
-    dom[i].Gfy.knb = dom[i].Gfy.kn + 2 * DOM_BUF;
-    dom[i].Gfy.ke = dom[i].Gfy.ks + dom[i].Gfy.kn;
-    dom[i].Gfy.keb = dom[i].Gfy.ke + DOM_BUF;
-
-    dom[i].Gfy.s1 = dom[i].Gfy.in;
-    dom[i].Gfy.s2 = dom[i].Gfy.s1 * dom[i].Gfy.jn;
-    dom[i].Gfy.s3 = dom[i].Gfy.s2 * dom[i].Gfy.kn;
-    dom[i].Gfy.s1b = dom[i].Gfy.inb;
-    dom[i].Gfy.s2b = dom[i].Gfy.s1b * dom[i].Gfy.jnb;
-    dom[i].Gfy.s3b = dom[i].Gfy.s2b * dom[i].Gfy.knb;
-
-    dom[i].Gfy._is = DOM_BUF;
-    dom[i].Gfy._isb = dom[i].Gfy._is - DOM_BUF;
-    dom[i].Gfy._in = dom[i].xn;
-    dom[i].Gfy._inb = dom[i].Gfy._in + 2 * DOM_BUF;
-    dom[i].Gfy._ie = dom[i].Gfy._is + dom[i].Gfy._in;
-    dom[i].Gfy._ieb = dom[i].Gfy._ie + DOM_BUF;
-
-    dom[i].Gfy._js = DOM_BUF;
-    dom[i].Gfy._jsb = dom[i].Gfy._js - DOM_BUF;
-    dom[i].Gfy._jn = dom[i].yn + 1;
-    dom[i].Gfy._jnb = dom[i].Gfy._jn + 2 * DOM_BUF;
-    dom[i].Gfy._je = dom[i].Gfy._js + dom[i].Gfy._jn;
-    dom[i].Gfy._jeb = dom[i].Gfy._je + DOM_BUF;
-
-    dom[i].Gfy._ks = DOM_BUF;
-    dom[i].Gfy._ksb = dom[i].Gfy._ks - DOM_BUF;
-    dom[i].Gfy._kn = dom[i].zn;
-    dom[i].Gfy._knb = dom[i].Gfy._kn + 2 * DOM_BUF;
-    dom[i].Gfy._ke = dom[i].Gfy._ks + dom[i].Gfy._kn;
-    dom[i].Gfy._keb = dom[i].Gfy._ke + DOM_BUF;
-
-    dom[i].Gfy._s1 = dom[i].Gfy._in;
-    dom[i].Gfy._s2 = dom[i].Gfy._s1 * dom[i].Gfy._jn;
-    dom[i].Gfy._s3 = dom[i].Gfy._s2 * dom[i].Gfy._kn;
-    dom[i].Gfy._s1b = dom[i].Gfy._inb;
-    dom[i].Gfy._s2b = dom[i].Gfy._s1b * dom[i].Gfy._jnb;
-    dom[i].Gfy._s3b = dom[i].Gfy._s2b * dom[i].Gfy._knb;
-
-    // Gfz
-    if(dom[i].W > -1)
-      dom[i].Gfz.is = dom[dom[i].W].Gfz.ie;
-    else
-      dom[i].Gfz.is = DOM_BUF;
-    dom[i].Gfz.isb = dom[i].Gfz.is - DOM_BUF;
-    dom[i].Gfz.in = dom[i].xn;
-    dom[i].Gfz.inb = dom[i].Gfz.in + 2 * DOM_BUF;
-    dom[i].Gfz.ie = dom[i].Gfz.is + dom[i].Gfz.in;
-    dom[i].Gfz.ieb = dom[i].Gfz.ie + DOM_BUF;
-
-    if(dom[i].S > -1)
-      dom[i].Gfz.js = dom[dom[i].S].Gfz.je;
-    else
-      dom[i].Gfz.js = DOM_BUF;
-    dom[i].Gfz.jsb = dom[i].Gfz.js - DOM_BUF;
-    dom[i].Gfz.jn = dom[i].yn;
-    dom[i].Gfz.jnb = dom[i].Gfz.jn + 2 * DOM_BUF;
-    dom[i].Gfz.je = dom[i].Gfz.js + dom[i].Gfz.jn;
-    dom[i].Gfz.jeb = dom[i].Gfz.je + DOM_BUF;
-
-    if(dom[i].B > -1)
-      dom[i].Gfz.ks = dom[dom[i].B].Gfz.ke;
-    else
-      dom[i].Gfz.ks = DOM_BUF;
-    dom[i].Gfz.ksb = dom[i].Gfz.ks - DOM_BUF;
-    dom[i].Gfz.kn = dom[i].zn + 1;
-    dom[i].Gfz.knb = dom[i].Gfz.kn + 2 * DOM_BUF;
-    dom[i].Gfz.ke = dom[i].Gfz.ks + dom[i].Gfz.kn;
-    dom[i].Gfz.keb = dom[i].Gfz.ke + DOM_BUF;
-
-    dom[i].Gfz.s1 = dom[i].Gfz.in;
-    dom[i].Gfz.s2 = dom[i].Gfz.s1 * dom[i].Gfz.jn;
-    dom[i].Gfz.s3 = dom[i].Gfz.s2 * dom[i].Gfz.kn;
-    dom[i].Gfz.s1b = dom[i].Gfz.inb;
-    dom[i].Gfz.s2b = dom[i].Gfz.s1b * dom[i].Gfz.jnb;
-    dom[i].Gfz.s3b = dom[i].Gfz.s2b * dom[i].Gfz.knb;
-
-    dom[i].Gfz._is = DOM_BUF;
-    dom[i].Gfz._isb = dom[i].Gfz._is - DOM_BUF;
-    dom[i].Gfz._in = dom[i].xn;
-    dom[i].Gfz._inb = dom[i].Gfz._in + 2 * DOM_BUF;
-    dom[i].Gfz._ie = dom[i].Gfz._is + dom[i].Gfz._in;
-    dom[i].Gfz._ieb = dom[i].Gfz._ie + DOM_BUF;
-
-    dom[i].Gfz._js = DOM_BUF;
-    dom[i].Gfz._jsb = dom[i].Gfz._js - DOM_BUF;
-    dom[i].Gfz._jn = dom[i].yn;
-    dom[i].Gfz._jnb = dom[i].Gfz._jn + 2 * DOM_BUF;
-    dom[i].Gfz._je = dom[i].Gfz._js + dom[i].Gfz._jn;
-    dom[i].Gfz._jeb = dom[i].Gfz._je + DOM_BUF;
-
-    dom[i].Gfz._ks = DOM_BUF;
-    dom[i].Gfz._ksb = dom[i].Gfz._ks - DOM_BUF;
-    dom[i].Gfz._kn = dom[i].zn + 1;
-    dom[i].Gfz._knb = dom[i].Gfz._kn + 2 * DOM_BUF;
-    dom[i].Gfz._ke = dom[i].Gfz._ks + dom[i].Gfz._kn;
-    dom[i].Gfz._keb = dom[i].Gfz._ke + DOM_BUF;
-
-    dom[i].Gfz._s1 = dom[i].Gfz._in;
-    dom[i].Gfz._s2 = dom[i].Gfz._s1 * dom[i].Gfz._jn;
-    dom[i].Gfz._s3 = dom[i].Gfz._s2 * dom[i].Gfz._kn;
-    dom[i].Gfz._s1b = dom[i].Gfz._inb;
-    dom[i].Gfz._s2b = dom[i].Gfz._s1b * dom[i].Gfz._jnb;
-    dom[i].Gfz._s3b = dom[i].Gfz._s2b * dom[i].Gfz._knb;
-  }
-
-  // set up grid index structs
-  // allocate and initialize pressure and velocity vectors
-  p0 = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
-  cpumem += Dom.Gcc.s3b * sizeof(real);
-  p = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
-  cpumem += Dom.Gcc.s3b * sizeof(real);
-  //divU = (real*) malloc(Dom.Gcc.s3b * sizeof(real));
-  cpumem += Dom.Gcc.s3b * sizeof(real);
-  u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  u0 = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  v0 = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  w0 = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  diff0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  diff0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  diff0_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  conv0_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  conv0_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  conv0_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  diff_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  diff_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  diff_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  conv_u = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  conv_v = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  conv_w = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  u_star = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  v_star = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  w_star = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
-  u_WE = (real*) malloc(Dom.Gfx.jnb*Dom.Gfx.knb * sizeof(real));
-  cpumem += Dom.Gfx.jnb*Dom.Gfx.knb * sizeof(real);
-  u_SN = (real*) malloc(Dom.Gfx.inb*Dom.Gfx.knb * sizeof(real));
-  cpumem += Dom.Gfx.inb*Dom.Gfx.knb * sizeof(real);
-  u_BT = (real*) malloc(Dom.Gfx.inb*Dom.Gfx.jnb * sizeof(real));
-  cpumem += Dom.Gfx.inb*Dom.Gfx.jnb * sizeof(real);
-  v_WE = (real*) malloc(Dom.Gfy.jnb*Dom.Gfy.knb * sizeof(real));
-  cpumem += Dom.Gfy.jnb*Dom.Gfy.knb * sizeof(real);
-  v_SN = (real*) malloc(Dom.Gfy.inb*Dom.Gfy.knb * sizeof(real));
-  cpumem += Dom.Gfy.inb*Dom.Gfy.knb * sizeof(real);
-  v_BT = (real*) malloc(Dom.Gfy.inb*Dom.Gfy.jnb * sizeof(real));
-  cpumem += Dom.Gfy.inb*Dom.Gfy.jnb * sizeof(real);
-  w_WE = (real*) malloc(Dom.Gfz.jnb*Dom.Gfz.knb * sizeof(real));
-  cpumem += Dom.Gfz.jnb*Dom.Gfz.knb * sizeof(real);
-  w_SN = (real*) malloc(Dom.Gfz.inb*Dom.Gfz.knb * sizeof(real));
-  cpumem += Dom.Gfz.inb*Dom.Gfz.knb * sizeof(real);
-  w_BT = (real*) malloc(Dom.Gfz.inb*Dom.Gfz.jnb * sizeof(real));
-  cpumem += Dom.Gfz.inb*Dom.Gfz.jnb * sizeof(real);
-  f_x = (real*) malloc(Dom.Gfx.s3b * sizeof(real));
-  cpumem += Dom.Gfx.s3b * sizeof(real);
-  f_y = (real*) malloc(Dom.Gfy.s3b * sizeof(real));
-  cpumem += Dom.Gfy.s3b * sizeof(real);
-  f_z = (real*) malloc(Dom.Gfz.s3b * sizeof(real));
-  cpumem += Dom.Gfz.s3b * sizeof(real);
+	int i, j, k;    // iterator
+	int C, W, E, S, N, B, T;
+	real tmp;
 	
-	//##########################################################################
 	// velocity field initialization(turb or not)
 	if(turb_switch == ON) {
 		
 		// set up the random number generator
 		srand(time(NULL));
-
+		
 		for(i = 0; i < Dom.Gcc.s3b; i++) {
 			p0[i] = 0.;
 			p[i] = 0.;
+			phi[i] = 0.;
 			//divU[i] = 0.;
 		}
+		
 		for(i = 0; i < Dom.Gfx.s3b; i++) {
 			u[i] = 0.;
-			diff0_u[i] = 0.;
+			#ifndef IMPLICIT
+				diff0_u[i] = 0.;
+			#endif
 			diff_u[i] = 0.;
 			u0[i] = 0.;
 			conv0_u[i] = 0.;
 			conv_u[i] = 0.;
 			f_x[i] = 0.;
+			u_star[i] = 0.;
 		}
 		for(i = 0; i < Dom.Gfy.s3b; i++) {
 			v[i] = 0.;
-			diff0_v[i] = 0.;
+			#ifndef IMPLICIT
+				diff0_v[i] = 0.;
+			#endif
 			diff_v[i] = 0.;
 			v0[i] = 0.;
 			conv0_v[i] = 0.;
 			conv_v[i] = 0.;
 			f_y[i] = 0.;
+			v_star[i] = 0.;
 		}
 		for(i = 0; i < Dom.Gfz.s3b; i++) {
 			w[i] = 0.;
-			diff0_w[i] = 0.;
+			#ifndef IMPLICIT
+				diff0_w[i] = 0.;
+			#endif
 			diff_w[i] = 0.;
 			w0[i] = 0.;
 			conv0_w[i] = 0.;
 			conv_w[i] = 0.;
 			f_z[i] = 0.;
+			w_star[i] = 0.;
 		}
-
+	
 		// integral scale
 		turbl = (Dom.xl + Dom.yl + Dom.zl) / 3.;
 		real urms = 3*turbA*turbl;
-
+		
 		// randomly initialize velocity components
 		for(i = 0; i < Dom.Gfx.s3b; i++) {
 			tmp = (rand() / (real)RAND_MAX - 0.5) * urms;
@@ -2607,9 +1524,9 @@ int domain_init_Eulerian(void)
 			w[i] = tmp;
 			w0[i] = tmp;
 		}
-
+		
 		// calculate the divergence of U
-		real vol = (Dom.xn+2*DOM_BUF)*(Dom.yn+2*DOM_BUF)*(Dom.zn+2*DOM_BUF);
+		real vol = Dom.xn*Dom.yn*Dom.zn;
 		for(k = Dom.Gcc.ksb; k < Dom.Gcc.keb; k++) {
 			for(j = Dom.Gcc.jsb; j < Dom.Gcc.jeb; j++) {
 				for(i = Dom.Gcc.isb; i < Dom.Gcc.ieb; i++) {
@@ -2625,7 +1542,7 @@ int domain_init_Eulerian(void)
 				}
 			}
 		}
-
+		
 		real umean = 0.;
 		real vmean = 0.;
 		real wmean = 0.;
@@ -2638,7 +1555,6 @@ int domain_init_Eulerian(void)
 					E = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
 					u[C] = u[C] - 0.5*(p[W] + p[E]);
 					u0[C] = u0[C] - 0.5*(p[W] + p[E]);
-					umean += u[C];
 				}
 			}
 		}
@@ -2650,7 +1566,6 @@ int domain_init_Eulerian(void)
 					N = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
 					v[C] = v[C] - 0.5*(p[S] + p[N]);
 					v0[C] = v0[C] - 0.5*(p[S] + p[N]);
-					vmean += v[C];
 				}
 			}
 		}
@@ -2662,15 +1577,39 @@ int domain_init_Eulerian(void)
 					T = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
 					w[C] = w[C] - 0.5*(p[B] + p[T]);
 					w0[C] = w0[C] - 0.5*(p[B] + p[T]);
-					wmean += w[C];
 				}
 			}
 		}
-
+		
+		for(k = Dom.Gfx.ks; k < Dom.Gfx.ke; k++) {
+			for(j = Dom.Gfx.js; j < Dom.Gfx.je; j++) {
+				for(i = Dom.Gfx.is; i < Dom.Gfx.ie-1; i++) {
+					C = i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
+					umean += u[C];
+				}
+			}
+		}
+		for(k = Dom.Gfy.ks; k < Dom.Gfy.ke; k++) {
+			for(j = Dom.Gfy.js; j < Dom.Gfy.je-1; j++) {
+				for(i = Dom.Gfy.is; i < Dom.Gfy.ie; i++) {
+					C = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
+					vmean += v[C];
+				}
+			}
+		}
+		for(k = Dom.Gfz.ks; k < Dom.Gfz.ke-1; k++) {
+			for(j = Dom.Gfz.js; j < Dom.Gfz.je; j++) {
+				for(i = Dom.Gfz.is; i < Dom.Gfz.ie; i++) {
+					C = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
+					wmean += w[C];
+				}
+			}
+		} 
+		
 		umean /= vol;
 		vmean /= vol;
 		wmean /= vol;
-
+		
 		// re-scale to give zero mean velocity in each direction
 		for(k = Dom.Gfx.ksb; k < Dom.Gfx.keb; k++) {
 			for(j = Dom.Gfx.jsb; j < Dom.Gfx.jeb; j++) {
@@ -2699,114 +1638,7 @@ int domain_init_Eulerian(void)
 				}
 			}
 		}
-	} else if(turb_switch == OFF) {
-		
-		// initialize QUIESCENT flow (default)
-		for(i = 0; i < Dom.Gcc.s3b; i++) {
-			p0[i] = 0.;
-			p[i] = 0.;
-			//divU[i] = 0.;
-		}
-		
-		for(i = 0; i < Dom.Gfx.s3b; i++) {
-			u[i] = 0.;
-			diff0_u[i] = 0.;
-			diff_u[i] = 0.;
-			u0[i] = 0.;
-			conv0_u[i] = 0.;
-			conv_u[i] = 0.;
-			f_x[i] = 0.;
-			u_star[i] = 0.;
-		}
-		for(i = 0; i < Dom.Gfy.s3b; i++) {
-			v[i] = 0.;
-			diff0_v[i] = 0.;
-			diff_v[i] = 0.;
-			v0[i] = 0.;
-			conv0_v[i] = 0.;
-			conv_v[i] = 0.;
-			f_y[i] = 0.;
-			v_star[i] = 0.;
-		}
-		for(i = 0; i < Dom.Gfz.s3b; i++) {
-			w[i] = 0.;
-			diff0_w[i] = 0.;
-			diff_w[i] = 0.;
-			w0[i] = 0.;
-			conv0_w[i] = 0.;
-			conv_w[i] = 0.;
-			f_z[i] = 0.;
-			w_star[i] = 0.;
-		}
-		
-		//#######################
-		/*
-		for(k = Dom.Gfz.ksb; k < Dom.Gfz.keb; k++) {
-			for(j = Dom.Gfz.jsb; j < Dom.Gfz.jeb; j++) {
-				for(i = Dom.Gfz.isb; i < Dom.Gfz.ieb; i++) {
-					real x = ((i-0.5) * Dom.dx) + Dom.xs;
-					real y = ((j-0.5) * Dom.dy) + Dom.ys;
-					//real r = sqrt(x*x+y*y);
-					int C = i+j*Dom.Gfz.s1b+k*Dom.Gfz.s2b;
-					w[C] = 1e-3*(4.0-fabs(x)-fabs(y));
-					w0[C] = w[C];
-				}
-			}
-		}
-		*/
-		//##########################
-		
-		// prevent turbulence linear forcing from being used
-		turbl = 0.; // integral scale
 	}
-	//##########################################################################
-	
-  for(i = 0; i < Dom.Gfx.jnb*Dom.Gfx.knb; i++) {
-    u_WE[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfx.inb*Dom.Gfx.knb; i++) {
-    u_SN[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfx.inb*Dom.Gfx.jnb; i++) {
-    u_BT[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfy.jnb*Dom.Gfy.knb; i++) {
-    v_WE[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfy.inb*Dom.Gfy.knb; i++) {
-    v_SN[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfy.inb*Dom.Gfy.jnb; i++) {
-    v_BT[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfz.jnb*Dom.Gfz.knb; i++) {
-    w_WE[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfz.inb*Dom.Gfz.knb; i++) {
-    w_SN[i] = 0.;
-  }
-  for(i = 0; i < Dom.Gfz.inb*Dom.Gfz.jnb; i++) {
-    w_BT[i] = 0.;
-  }
-
-  // initialize some variables
-  dt = 2 * nu / (Dom.dx * Dom.dx);
-  dt += 2 * nu / (Dom.dy * Dom.dy);
-  dt += 2 * nu / (Dom.dz * Dom.dz);
-  dt = CFL / dt;
-  dt0 = -1.;
-  stepnum = 0;
-  rec_flow_field_stepnum_out = 0;
-  rec_paraview_stepnum_out = 0;
-  rec_particle_stepnum_out = 0;
-  rec_precursor_stepnum_out = 0;
-  rec_flow_field_ttime_out = 0;
-  rec_paraview_ttime_out = 0;
-  rec_particle_ttime_out = 0;
-  rec_restart_ttime_out = 0;
-  rec_precursor_ttime_out = 0;
-
-  return EXIT_SUCCESS;
 }
 
 void cgns_flow_field_Eulerian2(void)
@@ -2852,6 +1684,7 @@ void cgns_flow_field_Eulerian2(void)
 	//int fnbubmas;
 	int fnconcen;
 	int fnbubdia;
+	int fntervel;
 
 	// open the output file
 	cg_open(fnameall, CG_MODE_WRITE, &fn);
@@ -2936,21 +1769,7 @@ void cgns_flow_field_Eulerian2(void)
 		}
 	}
 	cg_field_write(fn, bn, zn, sn, RealDouble, "VelocityZ", wout, &fnw);
-	/*
-	real *wbout = malloc(Dom.Gcc.s3 * sizeof(real));
-	// cpumem += Dom.Gcc.s3 * sizeof(real);
-	for(int k = Dom.Gfz.ks; k < Dom.Gfz.ke-1; k++) {
-		for(int j = Dom.Gfz.js; j < Dom.Gfz.je; j++) {
-			for(int i = Dom.Gfz.is; i < Dom.Gfz.ie; i++) {
-				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
-				int CC1 = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
-				int CC2 = i + j*Dom.Gfz.s1b + (k+1)*Dom.Gfz.s2b;
-				wbout[C] = 0.5 * (w_b[CC1] + w_b[CC2]);
-			}
-		}
-	}
-	cg_field_write(fn, bn, zn, sn, RealDouble, "BubbleVelocityZ", wbout, &fnwb);
-	*/
+	
 	real *numdenout = malloc(Dom.Gcc.s3 * sizeof(real));
 	// cpumem += Dom.Gcc.s3 * sizeof(real);
 	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
@@ -2963,20 +1782,7 @@ void cgns_flow_field_Eulerian2(void)
 		}
 	}
 	cg_field_write(fn, bn, zn, sn, RealDouble, "NumberDensity", numdenout, &fnnumden);
-	/*
-	real *bubmasout = malloc(Dom.Gcc.s3 * sizeof(real));
-	// cpumem += Dom.Gcc.s3 * sizeof(real);
-	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
-		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
-			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
-				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
-				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
-				bubmasout[C] = bubmas[CC];
-			}
-		}
-	}
-	cg_field_write(fn, bn, zn, sn, RealDouble, "BubbleMass", bubmasout, &fnbubmas);
-	*/
+	
 	real *concenout = malloc(Dom.Gcc.s3 * sizeof(real));
 	// cpumem += Dom.Gcc.s3 * sizeof(real);
 	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
@@ -3001,17 +1807,29 @@ void cgns_flow_field_Eulerian2(void)
 			}
 		}
 	}
-	cg_field_write(fn, bn, zn, sn, RealDouble, "Bubble Diameter", bubdiaout, &fnbubdia);
+	cg_field_write(fn, bn, zn, sn, RealDouble, "BubbleDiameter", bubdiaout, &fnbubdia);
+	
+	real *tervelout = malloc(Dom.Gcc.s3 * sizeof(real));
+	// cpumem += Dom.Gcc.s3 * sizeof(real);
+	for(int k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+		for(int j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(int i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+				int C = (i-DOM_BUF) + (j-DOM_BUF)*Dom.Gcc.s1 + (k-DOM_BUF)*Dom.Gcc.s2;
+				int CC = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
+				tervelout[C] = ter_cell[CC];
+			}
+		}
+	}
+	cg_field_write(fn, bn, zn, sn, RealDouble, "TerminalVelocity", tervelout, &fntervel);
 	
 	free(pout);
 	free(uout);
 	free(vout);
 	free(wout);
-	//free(wbout);
 	free(numdenout);
-	//free(bubmasout);
 	free(concenout);
 	free(bubdiaout);
+	free(tervelout);
 	
 	cg_close(fn);
 	//==========================================================================
@@ -3060,4 +1878,323 @@ void cgns_flow_field_Eulerian2(void)
 	free(cgns_tseries);
 	cg_close(gn);
 	free(BaseIterName);
+}
+
+void Eulerian_out_restart(void)
+{
+  // create the file
+  char path[FILE_NAME_SIZE] = "";
+  sprintf(path, "%s/input/restart.config", ROOT_DIR);
+  FILE *rest = fopen(path, "w");
+  if(rest == NULL) {
+    fprintf(stderr, "Could not open file restart.input.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  fwrite(&ttime, sizeof(real), 1, rest);
+  fwrite(&dt0, sizeof(real), 1, rest);
+  fwrite(&dt, sizeof(real), 1, rest);
+  fwrite(&stepnum, sizeof(int), 1, rest);
+  fwrite(&rec_paraview_stepnum_out, sizeof(int), 1, rest);
+
+  fwrite(u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u0, sizeof(real), Dom.Gfx.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_u, sizeof(real), Dom.Gfx.s3b, rest);
+#endif
+  fwrite(conv0_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(diff_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(conv_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u_star, sizeof(real), Dom.Gfx.s3b, rest);
+
+  fwrite(v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v0, sizeof(real), Dom.Gfy.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_v, sizeof(real), Dom.Gfy.s3b, rest);
+#endif
+  fwrite(conv0_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(diff_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(conv_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v_star, sizeof(real), Dom.Gfy.s3b, rest);
+
+  fwrite(w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w0, sizeof(real), Dom.Gfz.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_w, sizeof(real), Dom.Gfz.s3b, rest);
+#endif
+  fwrite(conv0_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(diff_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(conv_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w_star, sizeof(real), Dom.Gfz.s3b, rest);
+
+  fwrite(p, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phi, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(p0, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phase, sizeof(int), Dom.Gcc.s3b, rest);
+  fwrite(phase_shell, sizeof(int), Dom.Gcc.s3b, rest);
+  //############################################################################
+  fwrite(numden, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(bubmas, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(concen, sizeof(real), Dom.Gcc.s3b, rest);
+  //############################################################################
+
+  fwrite(flag_u, sizeof(int), Dom.Gfx.s3b, rest);
+  fwrite(flag_v, sizeof(int), Dom.Gfy.s3b, rest);
+  fwrite(flag_w, sizeof(int), Dom.Gfz.s3b, rest);
+
+  fwrite(bc_plane_pos, sizeof(real), 9, rest);
+
+  fwrite(parts, sizeof(part_struct), nparts, rest);
+
+  fwrite(&coeff_stride, sizeof(int), 1, rest);
+
+  fwrite(pnm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im00, sizeof(real), nparts*coeff_stride, rest);
+
+  fwrite(&rec_flow_field_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_paraview_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_particle_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_restart_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_prec_ttime_out, sizeof(real), 1, rest);
+  fwrite(&pid_int, sizeof(real), 1, rest);
+  fwrite(&pid_back, sizeof(real), 1, rest);
+  fwrite(&gradP.z, sizeof(real), 2, rest);
+
+  // close the file
+  fclose(rest);
+}
+
+void out_restart_Eulerian(void)
+{
+  // create the file
+  char path[FILE_NAME_SIZE] = "";
+  sprintf(path, "%s/input/restart.config", ROOT_DIR);
+  FILE *rest = fopen(path, "w");
+  if(rest == NULL) {
+    fprintf(stderr, "Could not open file restart.input.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  fwrite(&ttime, sizeof(real), 1, rest);
+  fwrite(&dt0, sizeof(real), 1, rest);
+  fwrite(&dt, sizeof(real), 1, rest);
+  fwrite(&stepnum, sizeof(int), 1, rest);
+  fwrite(&rec_paraview_stepnum_out, sizeof(int), 1, rest);
+
+  fwrite(u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u0, sizeof(real), Dom.Gfx.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_u, sizeof(real), Dom.Gfx.s3b, rest);
+#endif
+  fwrite(conv0_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(diff_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(conv_u, sizeof(real), Dom.Gfx.s3b, rest);
+  fwrite(u_star, sizeof(real), Dom.Gfx.s3b, rest);
+
+  fwrite(v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v0, sizeof(real), Dom.Gfy.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_v, sizeof(real), Dom.Gfy.s3b, rest);
+#endif
+  fwrite(conv0_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(diff_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(conv_v, sizeof(real), Dom.Gfy.s3b, rest);
+  fwrite(v_star, sizeof(real), Dom.Gfy.s3b, rest);
+
+  fwrite(w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w0, sizeof(real), Dom.Gfz.s3b, rest);
+#ifndef IMPLICIT
+  fwrite(diff0_w, sizeof(real), Dom.Gfz.s3b, rest);
+#endif
+  fwrite(conv0_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(diff_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(conv_w, sizeof(real), Dom.Gfz.s3b, rest);
+  fwrite(w_star, sizeof(real), Dom.Gfz.s3b, rest);
+
+  fwrite(p, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phi, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(p0, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(phase, sizeof(int), Dom.Gcc.s3b, rest);
+  fwrite(phase_shell, sizeof(int), Dom.Gcc.s3b, rest);
+  //############################################################################
+  fwrite(numden, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(bubmas, sizeof(real), Dom.Gcc.s3b, rest);
+  fwrite(concen, sizeof(real), Dom.Gcc.s3b, rest);
+  //############################################################################
+
+  fwrite(flag_u, sizeof(int), Dom.Gfx.s3b, rest);
+  fwrite(flag_v, sizeof(int), Dom.Gfy.s3b, rest);
+  fwrite(flag_w, sizeof(int), Dom.Gfz.s3b, rest);
+
+  fwrite(bc_plane_pos, sizeof(real), 9, rest);
+
+  fwrite(parts, sizeof(part_struct), nparts, rest);
+
+  fwrite(&coeff_stride, sizeof(int), 1, rest);
+
+  fwrite(pnm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(pnm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(phinm_im00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im0, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_re00, sizeof(real), nparts*coeff_stride, rest);
+  fwrite(chinm_im00, sizeof(real), nparts*coeff_stride, rest);
+
+  fwrite(&rec_flow_field_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_paraview_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_particle_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_restart_ttime_out, sizeof(real), 1, rest);
+  fwrite(&rec_prec_ttime_out, sizeof(real), 1, rest);
+  fwrite(&pid_int, sizeof(real), 1, rest);
+  fwrite(&pid_back, sizeof(real), 1, rest);
+  fwrite(&gradP.z, sizeof(real), 2, rest);
+
+  // close the file
+  fclose(rest);
+}
+
+void in_restart_Eulerian(void)
+{
+  int fret = 0;
+  fret = fret; // prevent compiler warning
+  // open configuration file for reading
+  char fname[FILE_NAME_SIZE] = "";
+  sprintf(fname, "%s/input/restart.config", ROOT_DIR);
+  FILE *infile = fopen(fname, "r");
+  if(infile == NULL) {
+    fprintf(stderr, "Could not open file %s\n", fname);
+    exit(EXIT_FAILURE);
+  }
+
+  fret = fread(&ttime, sizeof(real), 1, infile);
+  fret = fread(&dt0, sizeof(real), 1, infile);
+  fret = fread(&dt, sizeof(real), 1, infile);
+  fret = fread(&stepnum, sizeof(int), 1, infile);
+  fret = fread(&rec_paraview_stepnum_out, sizeof(int), 1, infile);
+
+  fret = fread(u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u0, sizeof(real), Dom.Gfx.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_u, sizeof(real), Dom.Gfx.s3b, infile);
+#endif
+  fret = fread(conv0_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(diff_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(conv_u, sizeof(real), Dom.Gfx.s3b, infile);
+  fret = fread(u_star, sizeof(real), Dom.Gfx.s3b, infile);
+
+  fret = fread(v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v0, sizeof(real), Dom.Gfy.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_v, sizeof(real), Dom.Gfy.s3b, infile);
+#endif
+  fret = fread(conv0_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(diff_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(conv_v, sizeof(real), Dom.Gfy.s3b, infile);
+  fret = fread(v_star, sizeof(real), Dom.Gfy.s3b, infile);
+
+  fret = fread(w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w0, sizeof(real), Dom.Gfz.s3b, infile);
+#ifndef IMPLICIT
+  fret = fread(diff0_w, sizeof(real), Dom.Gfz.s3b, infile);
+#endif
+  fret = fread(conv0_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(diff_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(conv_w, sizeof(real), Dom.Gfz.s3b, infile);
+  fret = fread(w_star, sizeof(real), Dom.Gfz.s3b, infile);
+
+  fret = fread(p, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phi, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(p0, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(phase, sizeof(int), Dom.Gcc.s3b, infile);
+  fret = fread(phase_shell, sizeof(int), Dom.Gcc.s3b, infile);
+  //############################################################################
+  fret = fread(numden, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(bubmas, sizeof(real), Dom.Gcc.s3b, infile);
+  fret = fread(concen, sizeof(real), Dom.Gcc.s3b, infile);
+  //############################################################################
+
+  fret = fread(flag_u, sizeof(int), Dom.Gfx.s3b, infile);
+  fret = fread(flag_v, sizeof(int), Dom.Gfy.s3b, infile);
+  fret = fread(flag_w, sizeof(int), Dom.Gfz.s3b, infile);
+
+  fret = fread(bc_plane_pos, sizeof(real), 9, infile);
+
+  fret = fread(parts, sizeof(part_struct), nparts, infile);
+
+  fret = fread(&coeff_stride, sizeof(int), 1, infile);
+
+  fret = fread(pnm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(pnm_im00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(phinm_im00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im0, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_re00, sizeof(real), nparts*coeff_stride, infile);
+  fret = fread(chinm_im00, sizeof(real), nparts*coeff_stride, infile);
+
+  fret = fread(&rec_flow_field_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_paraview_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_particle_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_restart_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&rec_prec_ttime_out, sizeof(real), 1, infile);
+  fret = fread(&pid_int, sizeof(real), 1, infile);
+  fret = fread(&pid_back, sizeof(real), 1, infile);
+  fret = fread(&gradP.z, sizeof(real), 1, infile);
+
+  // close file
+  fclose(infile);
+}
+
+void compute_total_number(void)
+{
+	int i, j, k, C;
+	// totalnumden is the sum of number density inside the domain(without ghost cell)
+	totalnumden = 0;
+	for(i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
+		for(j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
+			for(k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
+				C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+				totalnumden += numden[C];
+			}
+		}
+	}
+	totalnumden = totalnumden * Dom.dx * Dom.dy * Dom.dz;
+	printf("Total bubble number(on host) = %f\n\n", totalnumden);
 }

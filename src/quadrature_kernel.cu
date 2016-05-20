@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -58,31 +58,8 @@ __global__ void check_nodes(int nparts, part_struct *parts, dom_struct *dom,
   y = yp + parts[part].y;
   z = zp + parts[part].z;
 
-  if(x < dom->xs && bc.uW == PERIODIC) x = x + dom->xl;
-  else if(x > dom->xe && bc.uE == PERIODIC) x = x - dom->xl;
-  if(y < dom->ys && bc.vS == PERIODIC) y = y + dom->yl;
-  else if(y > dom->ye && bc.vN == PERIODIC) y = y - dom->yl;
-  if(z < dom->zs && bc.wB == PERIODIC) z = z + dom->zl;
-  else if(z > dom->ze && bc.wT == PERIODIC) z = z - dom->zl;
-
-  __syncthreads();
-
   // start off with all -1's
   parts[part].nodes[node] = -1;
-  // check if the node is interfered with by another particle
-  // give it the value of the particle if it is, otherwise, set to -1
-  for(int i = 0; i < nparts; i++) {
-    //if(i != part) { // a particle can never interfere with its own nodes
-      // compute distance between node and other particle's center
-      real dx = x - parts[i].x;
-      real dy = y - parts[i].y;
-      real dz = z - parts[i].z;
-      real dist = sqrt(dx*dx + dy*dy + dz*dz);
-      if(dist < parts[i].r && parts[part].nodes[node] == -1)
-        parts[part].nodes[node] = i;
-  //printf("part[%d-->%d].node[%d] = %d\n", part, i, node, parts[part].nodes[node]);
-    //}
-  }
 
   // check if the node is interfered with by a wall
   // compute distance between node and walls
@@ -142,7 +119,6 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real wdot = parts[part].wdot;
 
   real uu, vv, ww;  // temporary nodes for Cartesian result of interpolation
-  real uunode, vvnode, wwnode;
   real uuwall, vvwall, wwwall;
 
   // convert node (r, theta, phi) to (x, y, z)
@@ -181,20 +157,6 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real zz = (k-0.5) * dom->dz + dom->zs;
 
   // interpolate pressure
-/*
-  real a = (0.5 * dt) / (0.5 * dt0 + 0.5 * dt);
-  real pc = (1. + 0.5 * a) * p[C] - 0.5 * a * p0[C];
-  real pw = (1. + 0.5 * a) * p[C-1] - 0.5 * a * p0[C-1];
-  real pe = (1. + 0.5 * a) * p[C+1] - 0.5 * a * p0[C+1];
-  real ps = (1. + 0.5 * a) * p[C-dom->Gcc.s1b] - 0.5 * a * p0[C-dom->Gcc.s1b];
-  real pn = (1. + 0.5 * a) * p[C+dom->Gcc.s1b] - 0.5 * a * p0[C+dom->Gcc.s1b];
-  real pb = (1. + 0.5 * a) * p[C-dom->Gcc.s2b] - 0.5 * a * p0[C-dom->Gcc.s2b];
-  real pt = (1. + 0.5 * a) * p[C+dom->Gcc.s2b] - 0.5 * a * p0[C+dom->Gcc.s2b];
-  real dpdx = 0.5 * (pe - pw) * ddx;
-  real dpdy = 0.5 * (pn - ps) * ddy;
-  real dpdz = 0.5 * (pt - pb) * ddz;
-*/
-
   real pc = p[C];
   real pw = p[C-1];
   real pe = p[C+1];
@@ -202,25 +164,9 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real pn = p[C+dom->Gcc.s1b];
   real pb = p[C-dom->Gcc.s2b];
   real pt = p[C+dom->Gcc.s2b];
-  real dpdx = 0.5 * (pe - pw) * ddx;
-  real dpdy = 0.5 * (pn - ps) * ddy;
-  real dpdz = 0.5 * (pt - pb) * ddz;
-
-/* WITH NEW FLOW SOLVER, PARTICLES SEEM TO NOT LIKE THIS
-  real a = dt0/dt;
-  a = (a + 2.)/(a + 1.);
-  real pc = p[C]*a + p0[C]*(1.-a);
-  real pw = p[C-1]*a + p0[C-1]*(1.-a);
-  real pe = p[C+1]*a + p0[C+1]*(1.-a);
-  real ps = p[C-dom->Gcc.s1b]*a + p0[C-dom->Gcc.s1b]*(1.-a);
-  real pn = p[C+dom->Gcc.s1b]*a + p0[C+dom->Gcc.s1b]*(1.-a);
-  real pb = p[C-dom->Gcc.s2b]*a + p0[C-dom->Gcc.s2b]*(1.-a);
-  real pt = p[C+dom->Gcc.s2b]*a + p0[C+dom->Gcc.s2b]*(1.-a);
-  real dpdx = 0.5 * (pe - pw) * ddx;
-  real dpdy = 0.5 * (pn - ps) * ddy;
-  real dpdz = 0.5 * (pt - pb) * ddz;
-*/
-
+  real dpdx = 0.5*(pe - pw) * ddx;
+  real dpdy = 0.5*(pn - ps) * ddy;
+  real dpdz = 0.5*(pt - pb) * ddz;
   pp[node+nnodes*part] = pc + dpdx*(x-xx) + dpdy*(y-yy) + dpdz*(z-zz);
   // switch to particle rest frame
   real ocrossr2 = (oy*zp - oz*yp) * (oy*zp - oz*yp);
@@ -230,7 +176,7 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real accdotr = (-gradP.x/rhoV - udot)*xp + (-gradP.y/rhoV - vdot)*yp
     + (-gradP.z/rhoV - wdot)*zp;
   pp[node+nnodes*part] -= 0.5 * rho_f * ocrossr2 + rho_f * accdotr;
-  // zero if this node intersects another particle
+  // zero if this node intersects wall
   pp[node+nnodes*part] = (parts[part].nodes[node]==-1)*pp[node+part*nnodes];
 
   // interpolate velocities
@@ -251,12 +197,10 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   yy = (j-0.5) * dom->dy + dom->ys;
   zz = (k-0.5) * dom->dz + dom->zs;
   C = i + j*dom->Gfx.s1b + k*dom->Gfx.s2b;
-  real dudx = 0.5 * (u[C+1] - u[C-1]) * ddx;
-  real dudy = 0.5 * (u[C+dom->Gfx.s1b] - u[C-dom->Gfx.s1b]) * ddy;
-  real dudz = 0.5 * (u[C+dom->Gfx.s2b] - u[C-dom->Gfx.s2b]) * ddz;
+  real dudx = 0.5*(u[C+1] - u[C-1]) * ddx;
+  real dudy = 0.5*(u[C+dom->Gfx.s1b] - u[C-dom->Gfx.s1b]) * ddy;
+  real dudz = 0.5*(u[C+dom->Gfx.s2b] - u[C-dom->Gfx.s2b]) * ddz;
   uu = u[C] + dudx * (x - xx) + dudy * (y - yy) + dudz * (z - zz);
-  // set uunode equal to interfering particle u-velocity
-  uunode = parts[intnode].u;
   // set uuwall equal to interfering wall u-velocity
   uuwall = (parts[part].nodes[node] == -10)*bc.uWD
             + (parts[part].nodes[node] == -11)*bc.uED
@@ -265,20 +209,17 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
             + (parts[part].nodes[node] == -14)*bc.uBD
             + (parts[part].nodes[node] == -15)*bc.uTD;
   // switch to particle rest frame
-  real rs2 = parts[part].rs*parts[part].rs;
-  real a2 = parts[part].r*parts[part].r;
+  real rs3 = parts[part].rs*parts[part].rs*parts[part].rs;
+  real rs5 = rs3*parts[part].rs*parts[part].rs;
+  real a5 = parts[part].r*parts[part].r*parts[part].r*parts[part].r*parts[part].r;
   real ocrossr_x = oy*zp - oz*yp;
   real odotcrossr_x = oydot*zp - ozdot*yp;
   uu -= parts[part].u + ocrossr_x;
-  uu -= 0.1/nu *(rs2-a2) * odotcrossr_x;
-  uunode -= parts[part].u + ocrossr_x;
-  uunode -= 0.1/nu *(rs2-a2) * odotcrossr_x;
+  uu -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_x;
   uuwall -= parts[part].u + ocrossr_x;
-  //uuwall -= 0.1 / nu / rs3 * (rs5 - r5) * odotcrossr_x;
-  uuwall -= 0.1/nu *(rs2-a2) * odotcrossr_x;
+  uuwall -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_x;
   // set actual node value based on whether it is interfered with
   uu = (parts[part].nodes[node]==-1)*uu
-    + (parts[part].nodes[node]!=part)*(parts[part].nodes[node]>-1)*uunode
     + (parts[part].nodes[node]<-1)*uuwall;
 //printf("uu = %f uuwall = %f\n", uu + parts[part].u + ocrossr_x + 0.1 / nu / rs3 * (rs5 - r5) * odotcrossr_x, uuwall + parts[part].u + ocrossr_x + 0.1 / nu / rs3 * (rs5 - r5) * odotcrossr_x);
 
@@ -296,12 +237,10 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   yy = (j-DOM_BUF) * dom->dy + dom->ys;
   zz = (k-0.5) * dom->dz + dom->zs;
   C = i + j*dom->Gfy.s1b + k*dom->Gfy.s2b;
-  real dvdx = 0.5 * (v[C+1] - v[C-1]) * ddx;
-  real dvdy = 0.5 * (v[C+dom->Gfy.s1b] - v[C-dom->Gfy.s1b]) * ddy;
-  real dvdz = 0.5 * (v[C+dom->Gfy.s2b] - v[C-dom->Gfy.s2b]) * ddz;
+  real dvdx = 0.5*(v[C+1] - v[C-1]) * ddx;
+  real dvdy = 0.5*(v[C+dom->Gfy.s1b] - v[C-dom->Gfy.s1b]) * ddy;
+  real dvdz = 0.5*(v[C+dom->Gfy.s2b] - v[C-dom->Gfy.s2b]) * ddz;
   vv = v[C] + dvdx * (x - xx) + dvdy * (y - yy) + dvdz * (z - zz);
-  // set vvnode equal to interfering particle v-velocity
-  vvnode = parts[intnode].v;
   // set vvwall equal to interfering wall v-velocity
   vvwall = (parts[part].nodes[node] == -10)*bc.vWD
             + (parts[part].nodes[node] == -11)*bc.vED
@@ -313,14 +252,11 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real ocrossr_y = -(ox*zp - oz*xp);
   real odotcrossr_y = -(oxdot*zp - ozdot*xp);
   vv -= parts[part].v + ocrossr_y;
-  vv -= 0.1/nu *(rs2-a2) * odotcrossr_y;
-  vvnode -= parts[part].v + ocrossr_y;
-  vvnode -= 0.1/nu *(rs2-a2) * odotcrossr_y;
+  vv -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_y;
   vvwall -= parts[part].v + ocrossr_y;
-  vvwall -= 0.1/nu *(rs2-a2) * odotcrossr_y;
+  vvwall -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_y;
   // set actual node value based on whether it is interfered with
   vv = (parts[part].nodes[node]==-1)*vv
-    + (parts[part].nodes[node]!=part)*(parts[part].nodes[node]>-1)*vvnode
     + (parts[part].nodes[node]<-1)*vvwall;
 
   // interpolate w-velocity
@@ -337,12 +273,10 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   yy = (j-0.5) * dom->dy + dom->ys;
   zz = (k-DOM_BUF) * dom->dz + dom->zs;
   C = i + j*dom->Gfz.s1b + k*dom->Gfz.s2b;
-  real dwdx = 0.5 * (w[C+1] - w[C-1]) * ddx;
-  real dwdy = 0.5 * (w[C+dom->Gfz.s1b] - w[C-dom->Gfz.s1b]) * ddy;
-  real dwdz = 0.5 * (w[C+dom->Gfz.s2b] - w[C-dom->Gfz.s2b]) * ddz;
+  real dwdx = 0.5*(w[C+1] - w[C-1]) * ddx;
+  real dwdy = 0.5*(w[C+dom->Gfz.s1b] - w[C-dom->Gfz.s1b]) * ddy;
+  real dwdz = 0.5*(w[C+dom->Gfz.s2b] - w[C-dom->Gfz.s2b]) * ddz;
   ww = w[C] + dwdx * (x - xx) + dwdy * (y - yy) + dwdz * (z - zz);
-  // set wwnode equal to interfering particle w-velocity
-  wwnode = parts[intnode].w;
   // set uuwall equal to interfering wall u-velocity
   wwwall = (parts[part].nodes[node] == -10)*bc.wWD
             + (parts[part].nodes[node] == -11)*bc.wED
@@ -354,14 +288,11 @@ __global__ void interpolate_nodes(real *p0, real *p, real *u, real *v, real *w,
   real ocrossr_z = ox*yp - oy*xp;
   real odotcrossr_z = oxdot*yp - oydot*xp;
   ww -= parts[part].w + ocrossr_z;
-  ww -= 0.1/nu *(rs2-a2) * odotcrossr_z;
-  wwnode -= parts[part].w + ocrossr_z;
-  wwnode -= 0.1/nu *(rs2-a2) * odotcrossr_z;
+  ww -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_z;
   wwwall -= parts[part].w + ocrossr_z;
-  wwwall -= 0.1/nu *(rs2-a2) * odotcrossr_z;
+  wwwall -= 0.1/nu *(rs5-a5)/rs3 * odotcrossr_z;
   // set actual node value based on whether it is interfered with
   ww = (parts[part].nodes[node]==-1)*ww
-    + (parts[part].nodes[node]!=part)*(parts[part].nodes[node]>-1)*wwnode
     + (parts[part].nodes[node]<-1)*wwwall;
 
   // convert (uu, vv, ww) to (u_r, u_theta, u_phi) and write to node arrays
@@ -474,8 +405,8 @@ __global__ void cuda_get_coeffs(part_struct *parts,
     real phi = node_p[node];
     real N_nm = nnm(n,m);
     real P_nm = pnm(n,m,theta);
-    real P_n1m = pnm(n+1,m,theta);
-    real dPdt = (n-m+1)*P_n1m-(n+1)*cos(theta)*P_nm;
+    real P_n1m = pnm(n+1.,m,theta);
+    real dPdt = (n-m+1.)*P_n1m-(n+1.)*cos(theta)*P_nm;
     real dPdp = m*P_nm;
 
     int_Yp_re[j] = N_nm*P_nm*pp[node+part*nnodes]*cos(m*phi);
@@ -609,13 +540,13 @@ __global__ void cuda_calc_forces(dom_struct *dom, part_struct *parts,
     real N10 = sqrt(3./4./PI);
     real N11 = sqrt(3./8./PI);
 
-    parts[pp].Fx = gradP.x + rho_f * vol * parts[pp].udot
+    parts[pp].Fx = rho_f * vol * (parts[pp].udot + gradP.x)
       - PI * mu * nu * 2.*N11 * (pnm_re[stride*pp + 2]
       + 6.*phinm_re[stride*pp + 2]);
-    parts[pp].Fy = gradP.y + rho_f * vol * parts[pp].vdot
+    parts[pp].Fy = rho_f * vol * (parts[pp].vdot + gradP.y)
       + PI * mu * nu * 2.*N11 * (pnm_im[stride*pp + 2]
       + 6.*phinm_im[stride*pp + 2]);
-    parts[pp].Fz = gradP.z + rho_f * vol * parts[pp].wdot
+    parts[pp].Fz = rho_f * vol * (parts[pp].wdot + gradP.z)
       + PI * mu * nu * N10 * (pnm_re[stride*pp + 1]
       + 6.*phinm_re[stride*pp + 1]);
 

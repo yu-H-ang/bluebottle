@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -1239,7 +1239,7 @@ __global__ void BC_w_T_T(real *w, dom_struct *dom, real* bc)
 }
 
 __global__ void project_u(real *u_star, real *p, real rho_f, real dt,
-  real *u, dom_struct *dom, real ddx, int *flag_u)
+  real *u, dom_struct *dom, real ddx, int *flag_u, int *phase)
 {
   int tj = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
   int tk = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
@@ -1250,14 +1250,14 @@ __global__ void project_u(real *u_star, real *p, real rho_f, real dt,
         + tk*dom->Gfx._s2b])
         * ddx * (p[i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b]
         - p[(i-1) + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b]);
-      u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = u_star[i + tj*dom->Gfx._s1b
-        + tk*dom->Gfx._s2b] - dt / rho_f * gradPhi;
+      u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = (u_star[i + tj*dom->Gfx._s1b
+        + tk*dom->Gfx._s2b] - dt / rho_f * gradPhi);
     }
   }
 }
 
 __global__ void project_v(real *v_star, real *p, real rho_f, real dt,
-  real *v, dom_struct *dom, real ddy, int *flag_v)
+  real *v, dom_struct *dom, real ddy, int *flag_v, int *phase)
 {
   int tk = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
   int ti = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
@@ -1268,14 +1268,14 @@ __global__ void project_v(real *v_star, real *p, real rho_f, real dt,
         + tk*dom->Gfy._s2b])
         * ddy * (p[ti + j*dom->Gcc._s1b + tk*dom->Gcc._s2b]
         - p[ti + (j-1)*dom->Gcc._s1b + tk*dom->Gcc._s2b]);
-      v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = v_star[ti + j*dom->Gfy._s1b
-        + tk*dom->Gfy._s2b] - dt / rho_f * gradPhi;
+      v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = (v_star[ti + j*dom->Gfy._s1b
+        + tk*dom->Gfy._s2b] - dt / rho_f * gradPhi);
     }
   }
 }
 
 __global__ void project_w(real *w_star, real *p, real rho_f, real dt,
-  real *w, dom_struct *dom, real ddz, int *flag_w)
+  real *w, dom_struct *dom, real ddz, int *flag_w, int *phase)
 {
   int ti = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
   int tj = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
@@ -1286,8 +1286,8 @@ __global__ void project_w(real *w_star, real *p, real rho_f, real dt,
         + k*dom->Gfz._s2b])
         * ddz * (p[ti + tj*dom->Gcc._s1b + k*dom->Gcc._s2b]
         - p[ti + tj*dom->Gcc._s1b + (k-1)*dom->Gcc._s2b]);
-      w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = w_star[ti + tj*dom->Gfz._s1b
-        + k*dom->Gfz._s2b] - dt / rho_f * gradPhi;
+      w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = (w_star[ti + tj*dom->Gfz._s1b
+        + k*dom->Gfz._s2b] - dt / rho_f * gradPhi);
     }
   }
 }
@@ -1314,8 +1314,8 @@ __global__ void update_p_laplacian(real *Lp, real *p, dom_struct *dom)
   }
 }
 
-__global__ void update_p(real *Lp, real *p0, real *p, dom_struct *dom,
-  real nu, real dt)
+__global__ void update_p(real *Lp, real *p0, real *p, real *phi,
+  dom_struct *dom, real nu, real dt, int *phase)
 {
   int tj = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
   int tk = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
@@ -1323,7 +1323,7 @@ __global__ void update_p(real *Lp, real *p0, real *p, dom_struct *dom,
   if(tj < dom->Gcc._je && tk < dom->Gcc._ke) {
     for(int i = dom->Gcc._is; i < dom->Gcc._ie; i++) {
       int C = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
-      p[C] = p0[C] + p[C] - 0.5*nu*dt*Lp[C];
+      p[C] = (phase[C] < 0) * (p0[C] + phi[C] - 0.5*nu*dt*Lp[C]);
     }
   }
 }
@@ -1491,10 +1491,11 @@ __global__ void copy_w_fluid(real *w_noghost, real *w_ghost, int *phase, dom_str
   }
 }
 
+#ifndef IMPLICIT
 __global__ void u_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *u_star,
-  dom_struct *dom, real dt0, real dt)
+  dom_struct *dom, real dt0, real dt, int *phase)
 {
   // create shared memory
   // no reason to load pressure into shared memory, but leaving it in global
@@ -1597,11 +1598,13 @@ __global__ void u_star_2(real rho_f, real nu,
       s_c[tj + tk*blockDim.x] = duudx + duvdy + duwdz;
 
       // convection term sums into right-hand side
+#ifndef STOKESFLOW
       if(dt0 > 0) // Adams-Bashforth
         s_u_star[tj + tk*blockDim.x] += (-ab * s_c[tj + tk*blockDim.x]
           + ab0 * conv0[i + j*dom->Gfx._s1b + k*dom->Gfx._s2b]);
       else        // forward Euler
         s_u_star[tj + tk*blockDim.x] += -s_c[tj + tk*blockDim.x];
+#endif
 
       // compute diffusion term (Adams-Bashforth stepping)
       real dud1 = (u211 - u111) * ddx;
@@ -1633,6 +1636,11 @@ __global__ void u_star_2(real rho_f, real nu,
 
       // velocity term sums into right-hand side
       s_u_star[tj + tk*blockDim.x] += u111;
+
+      // zero contribution inside particles
+      s_u_star[tj + tk*blockDim.x] *=
+        (phase[(i-1) + j*dom->Gcc._s1b + k*dom->Gcc._s2b] < 0
+        && phase[i + j*dom->Gcc._s1b + k*dom->Gcc._s2b] < 0);
     }
 
     // make sure all threads complete computations
@@ -1650,11 +1658,13 @@ __global__ void u_star_2(real rho_f, real nu,
     }
   }
 }
+#endif
 
+#ifndef IMPLICIT
 __global__ void v_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *v_star,
-  dom_struct *dom, real dt0, real dt)
+  dom_struct *dom, real dt0, real dt, int *phase)
 {
   // create shared memory
   // no reason to load pressure into shared memory, but leaving it in global
@@ -1755,11 +1765,13 @@ __global__ void v_star_2(real rho_f, real nu,
       s_c[tk + ti*blockDim.x] = dvudx + dvvdy + dvwdz;
 
       // convection term sums into right-hand side
+#ifndef STOKESFLOW
       if(dt0 > 0) // Adams-Bashforth
         s_v_star[tk + ti*blockDim.x] += (-ab * s_c[tk + ti*blockDim.x]
           + ab0 * conv0[i + j*dom->Gfy._s1b + k*dom->Gfy._s2b]);
       else
         s_v_star[tk + ti*blockDim.x] += -s_c[tk + ti*blockDim.x];
+#endif
 
       // compute diffusive term
       real dvd1 = (v211 - v111) * ddx;
@@ -1791,6 +1803,11 @@ __global__ void v_star_2(real rho_f, real nu,
 
       // velocity term sums into right-hand side
       s_v_star[tk + ti*blockDim.x] += v111;
+
+      // zero contribution inside particles
+      s_v_star[tk + ti*blockDim.x] *=
+        (phase[i + (j-1)*dom->Gcc._s1b + k*dom->Gcc._s2b] < 0
+        && phase[i + j*dom->Gcc._s1b + k*dom->Gcc._s2b] < 0);
     }
 
     // make sure all threads complete computations
@@ -1808,11 +1825,13 @@ __global__ void v_star_2(real rho_f, real nu,
     }
   }
 }
+#endif
 
+#ifndef IMPLICIT
 __global__ void w_star_2(real rho_f, real nu,
   real *u0, real *v0, real *w0, real *p, real *f,
   real *diff0, real *conv0, real *diff, real *conv, real *w_star,
-  dom_struct *dom, real dt0, real dt)
+  dom_struct *dom, real dt0, real dt, int *phase)
 {
   // create shared memory
   // no reason to load pressure into shared memory, but leaving it in global
@@ -1913,11 +1932,13 @@ __global__ void w_star_2(real rho_f, real nu,
       s_c[ti + tj*blockDim.x] = dwudx + dwvdy + dwwdz;
 
       // convection term sums into right-hand side
+#ifndef STOKESFLOW
       if(dt0 > 0) // Adams-Bashforth
         s_w_star[ti + tj*blockDim.x] += (-ab * s_c[ti + tj*blockDim.x]
           + ab0 * conv0[i + j*dom->Gfz._s1b + k*dom->Gfz._s2b]);
       else        // forward Euler
         s_w_star[ti + tj*blockDim.x] += -s_c[ti + tj*blockDim.x];
+#endif
 
       // compute diffusive term
       real dwd1 = (w211 - w111) * ddx;
@@ -1949,6 +1970,11 @@ __global__ void w_star_2(real rho_f, real nu,
 
       // velocity term sums into right-hand side
       s_w_star[ti + tj*blockDim.x] += w111;
+
+      // zero contribution inside particles
+      s_w_star[ti + tj*blockDim.x] *=
+        (phase[i + j*dom->Gcc._s1b + (k-1)*dom->Gcc._s2b] < 0
+        && phase[i + j*dom->Gcc._s1b + k*dom->Gcc._s2b] < 0);
     }
 
     // make sure all threads complete computations
@@ -1966,6 +1992,7 @@ __global__ void w_star_2(real rho_f, real nu,
     }
   }
 }
+#endif
 
 __global__ void forcing_reset_x(real *fx, dom_struct *dom)
 {
@@ -2197,76 +2224,31 @@ __global__ void plane_eps_z_T(real eps, real *w_star, dom_struct *dom)
 }
 
 __global__ void move_parts_a(dom_struct *dom, part_struct *parts, int nparts,
-  real dt, real dt0, g_struct g, real rho_f, real ttime)
+  real dt, real dt0, g_struct g, gradP_struct gradP, real rho_f, real ttime)
 {
   int pp = threadIdx.x + blockIdx.x*blockDim.x; // particle number
-  real m = 4./3. * PI * parts[pp].rho * parts[pp].r*parts[pp].r*parts[pp].r;
+  real vol = 4./3. * PI * parts[pp].r*parts[pp].r*parts[pp].r;
+  real m = vol * parts[pp].rho;
 
   if(pp < nparts) {
     if(parts[pp].translating) {
       // update linear accelerations
       parts[pp].udot = (parts[pp].Fx + parts[pp].kFx + parts[pp].iFx
-        + parts[pp].aFx) / m
+        + parts[pp].aFx - vol*gradP.x) / m
         + (parts[pp].rho - rho_f) / parts[pp].rho * g.x;
       parts[pp].vdot = (parts[pp].Fy + parts[pp].kFy + parts[pp].iFy
-        + parts[pp].aFy) / m
+        + parts[pp].aFy - vol*gradP.y) / m
         + (parts[pp].rho - rho_f) / parts[pp].rho * g.y;
       parts[pp].wdot = (parts[pp].Fz + parts[pp].kFz + parts[pp].iFz
-        + parts[pp].aFz) / m
+        + parts[pp].aFz - vol*gradP.z) / m
         + (parts[pp].rho - rho_f) / parts[pp].rho * g.z;
 
       // update linear velocities
-      parts[pp].u = parts[pp].u0 + parts[pp].udot * dt;
-      parts[pp].v = parts[pp].v0 + parts[pp].vdot * dt;
-      parts[pp].w = parts[pp].w0 + parts[pp].wdot * dt;
+      parts[pp].u = parts[pp].u0 + 0.5*dt*(parts[pp].udot + parts[pp].udot0);
+      parts[pp].v = parts[pp].v0 + 0.5*dt*(parts[pp].vdot + parts[pp].vdot0);
+      parts[pp].w = parts[pp].w0 + 0.5*dt*(parts[pp].wdot + parts[pp].wdot0);
 
       // do not update position
-    }
-  }
-}
-
-__global__ void move_parts_b(dom_struct *dom, part_struct *parts, int nparts,
-  real dt, real dt0, g_struct g, real rho_f, real ttime)
-{
-  int pp = threadIdx.x + blockIdx.x*blockDim.x; // particle number
-  real m = 4./3. * PI * parts[pp].rho * parts[pp].r*parts[pp].r*parts[pp].r;
-
-  if(pp < nparts) {
-    if(parts[pp].translating) {
-      // update linear accelerations
-      parts[pp].udot = (parts[pp].Fx + parts[pp].kFx + parts[pp].iFx
-        + parts[pp].aFx) / m
-        + (parts[pp].rho - rho_f) / parts[pp].rho * g.x;
-      parts[pp].vdot = (parts[pp].Fy + parts[pp].kFy + parts[pp].iFy
-        + parts[pp].aFy) / m
-        + (parts[pp].rho - rho_f) / parts[pp].rho * g.y;
-      parts[pp].wdot = (parts[pp].Fz + parts[pp].kFz + parts[pp].iFz
-        + parts[pp].aFz) / m
-        + (parts[pp].rho - rho_f) / parts[pp].rho * g.z;
-
-      // update linear velocities
-      parts[pp].u = parts[pp].u0 + parts[pp].udot * dt;
-      parts[pp].v = parts[pp].v0 + parts[pp].vdot * dt;
-      parts[pp].w = parts[pp].w0 + parts[pp].wdot * dt;
-
-      // update position (trapezoidal rule)
-      parts[pp].x = parts[pp].x + 0.5*(parts[pp].u+parts[pp].u0)*dt;
-      if(parts[pp].x < dom->xs) parts[pp].x = parts[pp].x + dom->xl;
-      else if(parts[pp].x > dom->xe) parts[pp].x = parts[pp].x - dom->xl;
-
-      parts[pp].y = parts[pp].y + 0.5*(parts[pp].v+parts[pp].v0)*dt;
-      if(parts[pp].y < dom->ys) parts[pp].y = parts[pp].y + dom->yl;
-      else if(parts[pp].y > dom->ye) parts[pp].y = parts[pp].y - dom->yl;
-
-      parts[pp].z = parts[pp].z + 0.5*(parts[pp].w+parts[pp].w0)*dt;
-      if(parts[pp].z < dom->zs) parts[pp].z = parts[pp].z + dom->zl;
-      else if(parts[pp].z > dom->ze) parts[pp].z = parts[pp].z - dom->zl;
-
-      // store for next time step
-      parts[pp].u0 = parts[pp].u;
-      parts[pp].v0 = parts[pp].v;
-      parts[pp].w0 = parts[pp].w;
-
     }
     if(parts[pp].rotating) {
       // update angular accelerations
@@ -2276,9 +2258,73 @@ __global__ void move_parts_b(dom_struct *dom, part_struct *parts, int nparts,
       parts[pp].ozdot = (parts[pp].Lz + parts[pp].iLz + parts[pp].aLz) / I;
 
       // update angular velocities
-      parts[pp].ox = parts[pp].ox0 + parts[pp].oxdot * dt;
-      parts[pp].oy = parts[pp].oy0 + parts[pp].oydot * dt;
-      parts[pp].oz = parts[pp].oz0 + parts[pp].ozdot * dt;
+      parts[pp].ox = parts[pp].ox0 + 0.5*dt*(parts[pp].oxdot + parts[pp].oxdot0);
+      parts[pp].oy = parts[pp].oy0 + 0.5*dt*(parts[pp].oydot + parts[pp].oydot0);
+      parts[pp].oz = parts[pp].oz0 + 0.5*dt*(parts[pp].ozdot + parts[pp].ozdot0);
+    }
+  }
+}
+
+__global__ void move_parts_b(dom_struct *dom, part_struct *parts, int nparts,
+  real dt, real dt0, g_struct g, gradP_struct gradP, real rho_f, real ttime)
+{
+  int pp = threadIdx.x + blockIdx.x*blockDim.x; // particle number
+  real vol = 4./3. * PI * parts[pp].r*parts[pp].r*parts[pp].r;
+  real m = vol * parts[pp].rho;
+
+  if(pp < nparts) {
+    if(parts[pp].translating) {
+      // update linear accelerations
+      parts[pp].udot = (parts[pp].Fx + parts[pp].kFx + parts[pp].iFx
+        + parts[pp].aFx - vol*gradP.x) / m
+        + (parts[pp].rho - rho_f) / parts[pp].rho * g.x;
+      parts[pp].vdot = (parts[pp].Fy + parts[pp].kFy + parts[pp].iFy
+        + parts[pp].aFy - vol*gradP.y) / m
+        + (parts[pp].rho - rho_f) / parts[pp].rho * g.y;
+      parts[pp].wdot = (parts[pp].Fz + parts[pp].kFz + parts[pp].iFz
+          + parts[pp].aFz - vol*gradP.z) / m
+        + (parts[pp].rho - rho_f) / parts[pp].rho * g.z;
+
+      // update linear velocities
+      parts[pp].u = parts[pp].u0 + 0.5*dt*(parts[pp].udot + parts[pp].udot0);
+      parts[pp].v = parts[pp].v0 + 0.5*dt*(parts[pp].vdot + parts[pp].vdot0);
+      parts[pp].w = parts[pp].w0 + 0.5*dt*(parts[pp].wdot + parts[pp].wdot0);
+
+      // update position (trapezoidal rule)
+      parts[pp].x = parts[pp].x0 + 0.5*dt*(parts[pp].u + parts[pp].u0);
+      if(parts[pp].x < dom->xs) parts[pp].x = parts[pp].x + dom->xl;
+      else if(parts[pp].x > dom->xe) parts[pp].x = parts[pp].x - dom->xl;
+
+      parts[pp].y = parts[pp].y0 + 0.5*dt*(parts[pp].v + parts[pp].v0);
+      if(parts[pp].y < dom->ys) parts[pp].y = parts[pp].y + dom->yl;
+      else if(parts[pp].y > dom->ye) parts[pp].y = parts[pp].y - dom->yl;
+
+      parts[pp].z = parts[pp].z0 + 0.5*dt*(parts[pp].w + parts[pp].w0);
+      if(parts[pp].z < dom->zs) parts[pp].z = parts[pp].z + dom->zl;
+      else if(parts[pp].z > dom->ze) parts[pp].z = parts[pp].z - dom->zl;
+
+      // store for next time step
+      parts[pp].x0 = parts[pp].x;
+      parts[pp].y0 = parts[pp].y;
+      parts[pp].z0 = parts[pp].z;
+      parts[pp].u0 = parts[pp].u;
+      parts[pp].v0 = parts[pp].v;
+      parts[pp].w0 = parts[pp].w;
+      parts[pp].udot0 = parts[pp].udot;
+      parts[pp].vdot0 = parts[pp].vdot;
+      parts[pp].wdot0 = parts[pp].wdot;
+    }
+    if(parts[pp].rotating) {
+      // update angular accelerations
+      real I = 0.4 * m * parts[pp].r*parts[pp].r;
+      parts[pp].oxdot = (parts[pp].Lx + parts[pp].iLx + parts[pp].aLx) / I;
+      parts[pp].oydot = (parts[pp].Ly + parts[pp].iLy + parts[pp].aLy) / I;
+      parts[pp].ozdot = (parts[pp].Lz + parts[pp].iLz + parts[pp].aLz) / I;
+
+      // update angular velocities
+      parts[pp].ox = parts[pp].ox0 + 0.5*dt*(parts[pp].oxdot + parts[pp].oxdot0);
+      parts[pp].oy = parts[pp].oy0 + 0.5*dt*(parts[pp].oydot + parts[pp].oydot0);
+      parts[pp].oz = parts[pp].oz0 + 0.5*dt*(parts[pp].ozdot + parts[pp].ozdot0);
 
       /* update basis vectors */
       // calculate rotation magnitude (trapezoidal rule)
@@ -2310,6 +2356,9 @@ __global__ void move_parts_b(dom_struct *dom, part_struct *parts, int nparts,
       parts[pp].ox0 = parts[pp].ox;
       parts[pp].oy0 = parts[pp].oy;
       parts[pp].oz0 = parts[pp].oz;
+      parts[pp].oxdot0 = parts[pp].oxdot;
+      parts[pp].oydot0 = parts[pp].oydot;
+      parts[pp].ozdot0 = parts[pp].ozdot;
     }
   }
 }
@@ -2340,227 +2389,401 @@ __global__ void collision_init(part_struct *parts, int nparts)
   }
 }
 
-__global__ void collision_parts(part_struct *parts, int i,
-  dom_struct *dom, real eps, real *forces, real *moments, int nparts, real mu,
-  BC bc)
+__global__ void init(int *vector, int N, int val)
 {
-  int j = threadIdx.x + blockIdx.x*blockDim.x;
+  int i = threadIdx.x + blockIdx.x*blockDim.x;
 
-  if(j < nparts) {
-    // clear out temporary array
-    forces[    j*3] = 0;
-    forces[1 + j*3] = 0;
-    forces[2 + j*3] = 0;
-    moments[    j*3] = 0;
-    moments[1 + j*3] = 0;
-    moments[2 + j*3] = 0;
+  if (i < N) {
+    vector[i] = val;
+  }
+}
 
-    if(j != i) {
-      real ai = parts[i].r;
-      real aj = parts[j].r;
-      real B = aj / ai;
-      real hN = 2.*(parts[i].rs - parts[i].r + parts[j].rs - parts[j].r);
+__global__ void bin_fill(int *partInd, int *partBin, int nparts,
+                  part_struct *parts, dom_struct *binDom, BC bc)
+{
+  int pp = threadIdx.x + blockIdx.x*blockDim.x;
 
-      real ux, uy, uz;
-      real rx, rx1, rx2, ry, ry1, ry2, rz, rz1, rz2, r;
-      real h, ah, lnah;
-      real nx, ny, nz, udotn;
-      real unx, uny, unz, utx, uty, utz, ut;
-      real tx, ty, tz, t, bx, by, bz, b;
-      real omegax, omegay, omegaz, omega;
-      real ocrossnx, ocrossny, ocrossnz;
-      real utcrossnx, utcrossny, utcrossnz;
-      real opB;
-      real Fnx, Fny, Fnz, Ftx, Fty, Ftz, Lox, Loy, Loz;
+  int c;
+  int ibin, jbin, kbin;
 
-      real xi = parts[i].x;
-      real xj = parts[j].x;
-      // check for neighbors across the domain when using periodic boundaries
-      rx = xi - xj;
-      rx1 = xi - (xj + dom->xl);
-      rx2 = xi - (xj - dom->xl);
-      if(rx1*rx1 < rx*rx) rx = rx1;
-      if(rx2*rx2 < rx*rx) rx = rx2;
-      rx = (bc.uW == PERIODIC) * rx + (bc.uW != PERIODIC) * (xi - xj);
+  // find the correct bin index for each part and store it
+  if (pp < nparts) {
+    ibin = floor((parts[pp].x - binDom->xs)/binDom->dx);
+    jbin = floor((parts[pp].y - binDom->ys)/binDom->dy);
+    kbin = floor((parts[pp].z - binDom->zs)/binDom->dz);
+    c = ibin + jbin*binDom->Gcc.s1 + kbin*binDom->Gcc.s2;
 
-      real yi = parts[i].y;
-      real yj = parts[j].y;
-      // check for neighbors across the domain when using periodic boundaries
-      ry = yi - yj;
-      ry1 = yi - (yj + dom->yl);
-      ry2 = yi - (yj - dom->yl);
-      if(ry1*ry1 < ry*ry) ry = ry1;
-      if(ry2*ry2 < ry*ry) ry = ry2;
-      ry = (bc.vS == PERIODIC) * ry + (bc.vS != PERIODIC) * (yi - yj);
+    partInd[pp] = pp;         // index of particle
+    partBin[pp] = c;          // bin index
+    parts[pp].bin = c;        // bin index (stored in particle)
+  }
+}
 
-      real zi = parts[i].z;
-      real zj = parts[j].z;
-      // check for neighbors across the domain when using periodic boundaries
-      rz = zi - zj;
-      rz1 = zi - (zj + dom->zl);
-      rz2 = zi - (zj - dom->zl);
-      if(rz1*rz1 < rz*rz) rz = rz1;
-      if(rz2*rz2 < rz*rz) rz = rz2;
-      rz = (bc.wB == PERIODIC) * rz + (bc.wB != PERIODIC) * (zi - zj);
+__global__ void bin_partCount(int *binCount, int *binStart, int *binEnd,
+                              dom_struct *binDom, BC bc, int nBins)
+{
+  int bin = threadIdx.x + blockIdx.x*blockDim.x;
 
-      ux = parts[i].u - parts[j].u;
-      uy = parts[i].v - parts[j].v;
-      uz = parts[i].w - parts[j].w;
+  // fill binCount
+  if (bin < nBins) {
+    binCount[bin] = binEnd[bin] - binStart[bin];
+  }
+}
 
-      r = sqrt(rx*rx + ry*ry + rz*rz);
+__global__ void bin_start(int *binStart, int *binEnd, int *partBin, int nparts)
+{
+  // This kernel function was adapted from NVIDIA CUDA 5.5 Examples
+  // This software contains source code provided by NVIDIA Corporation
+  extern __shared__ int sharedBin[];    //blockSize + 1
+  int index = threadIdx.x + blockIdx.x*blockDim.x;
+  int bin;
 
-      omegax = parts[i].ox - parts[j].ox;
-      omegay = parts[i].oy - parts[j].oy;
-      omegaz = parts[i].oz - parts[j].oz;
+  // for a given bin index, the previous bins's index is stored in sharedBin
+  if (index < nparts) {
+    bin = partBin[index]; 
 
-      omega = sqrt(omegax*omegax + omegay*omegay + omegaz*omegaz);
+    // Load bin data into shared memory so that we can look
+    // at neighboring particle's hash value without loading
+    // two bin values per thread
+    sharedBin[threadIdx.x + 1] = bin;
 
-      h = r - ai - aj;
+    if (index > 0 && threadIdx.x == 0) {
+      // first thread in block must load neighbor particle bin
+      sharedBin[0] = partBin[index - 1];
+    }
+  }
+  __syncthreads();
 
-      nx = rx / r;
-      ny = ry / r;
-      nz = rz / r;
+  if (index < nparts) {
+    // If this particle has a different cell index to the previous
+    // particle then it must be the first particle in the cell,
+    // so store the index of this particle in the cell.
+    // As it isn't the first particle, it must also be the cell end of
+    // the previous particle's cell
+    bin = partBin[index]; 
 
-      udotn = ux * nx + uy * ny + uz * nz;
+    if (index == 0 || bin != sharedBin[threadIdx.x]) {
+    binStart[bin] = index;
 
-      unx = udotn * nx;
-      uny = udotn * ny;
-      unz = udotn * nz;
-
-      utx = ux - unx;
-      uty = uy - uny;
-      utz = uz - unz;
-
-      ut = sqrt(utx*utx + uty*uty + utz*utz);
-
-      if(ut > 0) {
-        tx = utx / ut;
-        ty = uty / ut;
-        tz = utz / ut;
-
-        bx = ny*tz - nz*ty;
-        by = -nx*tz + nz*tx;
-        bz = nx*ty - ny*tx;
-
-        b = sqrt(bx*bx + by*by + bz*bz);
-
-        bx = bx / b;
-        by = by / b;
-        bz = bz / b;
-
-      } else if(omega > 0) {
-        bx = omegax / omega;
-        by = omegay / omega;
-        bz = omegaz / omega;
-
-        tx = by*nz - bz*ny;
-        ty = -bx*nz + bz*nx;
-        tz = bx*ny - by*nx;
-
-        t = sqrt(tx*tx + ty*ty + tz*tz);
-
-        tx = tx / t;
-        ty = ty / t;
-        tz = tz / t;
-      } else {
-        tx = 1.;
-        ty = 0.;
-        tz = 0.;
-
-        bx = ny*tz - nz*ty;
-        by = -nx*tz + nz*tx;
-        bz = nx*ty - ny*tx;
-
-        b = sqrt(bx*bx + by*by + bz*bz);
-
-        bx = bx / b;
-        by = by / b;
-        bz = bz / b;
-      }
-
-      opB = 1 + B;
-
-      ocrossnx = omegay*nz - omegaz*ny;
-      ocrossny = -omegax*nz + omegaz*nx;
-      ocrossnz = omegax*ny - omegay*nx;
-
-      utcrossnx = uty*nz - utz*ny;
-      utcrossny = -utx*nz + utz*nx;
-      utcrossnz = utx*ny - uty*nx;
-
-      if(h < hN && h > 0) {
-        if(h < eps*parts[i].r) h = eps*parts[i].r;
-        ah = ai/h - ai/hN;
-        lnah = log(ai/h);
-        Fnx = -1. * B*B / (opB*opB) * ah - (1.+7.*B+B*B)/(5.*opB*opB*opB)*lnah;
-        Fny = Fnx;
-        Fnz = Fnx;
-        Fnx *= 6.*PI*mu*ai*unx;
-        Fny *= 6.*PI*mu*ai*uny;
-        Fnz *= 6.*PI*mu*ai*unz;
-
-        Ftx = -6.*PI*mu*ai*utx*4.*B*(2.+B+2.*B*B)/(15.*opB*opB*opB)*lnah;
-        Fty = -6.*PI*mu*ai*uty*4.*B*(2.+B+2.*B*B)/(15.*opB*opB*opB)*lnah;
-        Ftz = -6.*PI*mu*ai*utz*4.*B*(2.+B+2.*B*B)/(15.*opB*opB*opB)*lnah;
-        Ftx += 8.*PI*mu*ai*ai*ocrossnx*B*(4.+B)/(10.*opB*opB)*lnah;
-        Fty += 8.*PI*mu*ai*ai*ocrossny*B*(4.+B)/(10.*opB*opB)*lnah;
-        Ftz += 8.*PI*mu*ai*ai*ocrossnz*B*(4.+B)/(10.*opB*opB)*lnah;
-
-        Lox = -8.*PI*mu*ai*ai*utcrossnx*B*(4.+B)/(10.*opB*opB)*lnah;
-        Loy = -8.*PI*mu*ai*ai*utcrossny*B*(4.+B)/(10.*opB*opB)*lnah;
-        Loz = -8.*PI*mu*ai*ai*utcrossnz*B*(4.+B)/(10.*opB*opB)*lnah;
-        Lox += -8.*PI*mu*ai*ai*ai*omegax*2.*B/(5.*opB)*lnah;
-        Loy += -8.*PI*mu*ai*ai*ai*omegay*2.*B/(5.*opB)*lnah;
-        Loz += -8.*PI*mu*ai*ai*ai*omegaz*2.*B/(5.*opB)*lnah;
-      } else {
-        ah = 0;
-        lnah = 0;
-        Fnx = 0;
-        Fny = 0;
-        Fnz = 0;
-        Ftx = 0;
-        Fty = 0;
-        Ftz = 0;
-        Lox = 0;
-        Loy = 0;
-        Loz = 0;
-      }
-
-      if(h < 0) {
-        ah = 0;
-        lnah = 0;
-        real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)/parts[i].E
-          + (1-parts[j].sigma*parts[j].sigma)/parts[j].E)*sqrt(1./ai + 1./aj);
-        Fnx = sqrt(-h*h*h)/denom*nx;
-        Fny = sqrt(-h*h*h)/denom*ny;
-        Fnz = sqrt(-h*h*h)/denom*nz;
-      }
-
-      forces[    j*3] = Fnx + Ftx;
-      forces[1 + j*3] = Fny + Fty;
-      forces[2 + j*3] = Fnz + Ftz;
-      moments[    j*3] = Lox;
-      moments[1 + j*3] = Loy;
-      moments[2 + j*3] = Loz;
+        if (index > 0)
+            binEnd[sharedBin[threadIdx.x]] = index;
     }
 
-    __syncthreads();
+    if (index == nparts - 1)
+    {
+        binEnd[bin] = index + 1;
+    }
+  }
+}
 
-    if(j == 0) {
-      for(int k = 0; k < nparts; k++) {
-        parts[i].iFx += forces[    k*3];
-        parts[i].iFy += forces[1 + k*3];
-        parts[i].iFz += forces[2 + k*3];
-        parts[i].iLx += moments[    k*3];
-        parts[i].iLy += moments[1 + k*3];
-        parts[i].iLz += moments[2 + k*3];
+__global__ void collision_parts(part_struct *parts, int nparts,
+  dom_struct *dom, real eps, real mu, BC bc, int *binStart, int *binEnd,
+  int *partBin, int *partInd, dom_struct *binDom, int interactionLength)
+{
+  int index = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if (index < nparts) {
+
+    int i = partInd[index];
+    int bin = partBin[index];
+
+    int kbin = floorf(bin/binDom->Gcc.s2);
+    int jbin = floorf((bin - kbin*binDom->Gcc.s2)/binDom->Gcc.s1);
+    int ibin = bin - kbin*binDom->Gcc.s2 - jbin*binDom->Gcc.s1;
+
+    int l, m, n;                          // adjacent bin iterators
+    int target, j;                        // target indices
+    int adjBin, adjStart, adjEnd;         // adjacent bin stuff
+    int iStride, kStride, jStride;        // how to get to adjacent bin
+
+    // predefine face locations 
+    // -1, -2 due to local vs global indexing and defiinition of dom_struct
+    int fW = binDom->Gcc.is - 1;
+    int fE = binDom->Gcc.ie - 2;
+    int fS = binDom->Gcc.js - 1;
+    int fN = binDom->Gcc.je - 2;
+    int fB = binDom->Gcc.ks - 1;
+    int fT = binDom->Gcc.ke - 2;
+
+    // size checks
+    int xnBin = (binDom->xn > 2);
+    int ynBin = (binDom->yn > 2);
+    int znBin = (binDom->zn > 2);
+
+    // loop over adjacent bins and take care of periodic conditions 
+    for (n = -1; n <= 1; n++) {
+      // if on a face and not periodic, continue
+      // if on a face and periodic but only 2 bins, continue
+      if ((n == -1 && kbin == fB && bc.uB != PERIODIC) || 
+          (n == 1 && kbin == fT && bc.uT != PERIODIC) ||
+          (n == -1 && kbin == fB && bc.uB == PERIODIC && znBin == 0) ||
+          (n == 1 && kbin == fT && bc.uT == PERIODIC && znBin == 0)) {
+        continue;
+      // if on a face and periodic, flip to other side
+      } else if (n == -1 && kbin == fB && bc.uB == PERIODIC) {
+        kStride = fT*binDom->Gcc.s2;
+      } else if (n == 1 && kbin == fT && bc.uT == PERIODIC) {
+        kStride = fB*binDom->Gcc.s2;
+      // else, we are in the middle, do nothing special
+      } else {
+        kStride = (kbin + n)*binDom->Gcc.s2;
+      }
+
+      for (m = -1; m <= 1; m++) {
+        if ((m == -1 && jbin == fS && bc.uS != PERIODIC) ||
+            (m == 1 && jbin == fN && bc.uN != PERIODIC) ||
+            (m == -1 && jbin == fS && bc.uS == PERIODIC && ynBin == 0) ||
+            (m == 1 && jbin == fN && bc.uN == PERIODIC && ynBin == 0)) {
+          continue;
+        } else if (m == -1 && jbin == fS && bc.uS == PERIODIC) {
+          jStride = fN*binDom->Gcc.s1;  
+        } else if (m == 1 && jbin == fN && bc.uN == PERIODIC) {
+          jStride = fS*binDom->Gcc.s1;
+        } else {
+          jStride = (jbin + m)*binDom->Gcc.s1;
+        }
+
+        for (l = -1; l <= 1; l++) {
+          if ((l == -1 && ibin == fW && bc.uW != PERIODIC) ||
+              (l == 1 && ibin == fE && bc.uE != PERIODIC) ||
+              (l == -1 && ibin == fW && bc.uW == PERIODIC && xnBin == 0) ||
+              (l == 1 && ibin == fE && bc.uE == PERIODIC && xnBin == 0)) {
+            continue;
+          } else if (l == -1 && ibin == fW && bc.uW == PERIODIC) {
+            iStride = fE;
+          } else if (l == 1 && ibin == fE && bc.uE == PERIODIC) {
+            iStride = fW;
+          } else {
+            iStride = ibin + l;
+          }
+
+          adjBin = iStride + jStride + kStride; 
+          adjStart = binStart[adjBin];        // find start and end of bins
+          adjEnd = binEnd[adjBin];
+          if (adjStart != -1) {               // if bin is not empty
+            for (target = adjStart; target < adjEnd; target++) {
+              j = partInd[target];
+              if (j != i) {                   // if its not original part
+
+                // calculate forces
+
+                real ai = parts[i].r;
+                real aj = parts[j].r;
+                real B = aj / ai;
+                real hN = interactionLength;
+
+                real ux, uy, uz;
+                real rx, rx1, rx2, ry, ry1, ry2, rz, rz1, rz2, r;
+                real h, ah, lnah;
+                real nx, ny, nz, udotn;
+                real unx, uny, unz, utx, uty, utz, ut;
+                real tx, ty, tz, t, bx, by, bz, b;
+                real omegax, omegay, omegaz, omega;
+                real ocrossnx, ocrossny, ocrossnz;
+                real utcrossnx, utcrossny, utcrossnz;
+                real opB;
+                real Fnx, Fny, Fnz, Ftx, Fty, Ftz, Lox, Loy, Loz;
+
+                real xi = parts[i].x;
+                real xj = parts[j].x;
+                // check for neighbors across the domain when using periodic
+                // boundaries
+                rx = xi - xj;
+                rx1 = xi - (xj + dom->xl);
+                rx2 = xi - (xj - dom->xl);
+                if(rx1*rx1 < rx*rx) rx = rx1;
+                if(rx2*rx2 < rx*rx) rx = rx2;
+                rx = (bc.uW == PERIODIC) * rx + (bc.uW != PERIODIC) * (xi - xj);
+
+                real yi = parts[i].y;
+                real yj = parts[j].y;
+                // check for neighbors across the domain when using periodic
+                // boundaries
+                ry = yi - yj;
+                ry1 = yi - (yj + dom->yl);
+                ry2 = yi - (yj - dom->yl);
+                if(ry1*ry1 < ry*ry) ry = ry1;
+                if(ry2*ry2 < ry*ry) ry = ry2;
+                ry = (bc.vS == PERIODIC) * ry + (bc.vS != PERIODIC) * (yi - yj);
+
+                real zi = parts[i].z;
+                real zj = parts[j].z;
+                // check for neighbors across the domain when using periodic
+                // boundaries
+                rz = zi - zj;
+                rz1 = zi - (zj + dom->zl);
+                rz2 = zi - (zj - dom->zl);
+                if(rz1*rz1 < rz*rz) rz = rz1;
+                if(rz2*rz2 < rz*rz) rz = rz2;
+                rz = (bc.wB == PERIODIC) * rz + (bc.wB != PERIODIC) * (zi - zj);
+
+                ux = parts[i].u - parts[j].u;
+                uy = parts[i].v - parts[j].v;
+                uz = parts[i].w - parts[j].w;
+
+                r = sqrt(rx*rx + ry*ry + rz*rz);
+
+                omegax = parts[i].ox - parts[j].ox;
+                omegay = parts[i].oy - parts[j].oy;
+                omegaz = parts[i].oz - parts[j].oz;
+
+                omega = sqrt(omegax*omegax + omegay*omegay + omegaz*omegaz);
+
+                h = r - ai - aj;
+
+                nx = rx / r;
+                ny = ry / r;
+                nz = rz / r;
+
+                udotn = ux * nx + uy * ny + uz * nz;
+
+                unx = udotn * nx;
+                uny = udotn * ny;
+                unz = udotn * nz;
+
+                utx = ux - unx;
+                uty = uy - uny;
+                utz = uz - unz;
+
+                ut = sqrt(utx*utx + uty*uty + utz*utz);
+
+                if(ut > 0) {
+                  tx = utx / ut;
+                  ty = uty / ut;
+                  tz = utz / ut;
+
+                  bx = ny*tz - nz*ty;
+                  by = -nx*tz + nz*tx;
+                  bz = nx*ty - ny*tx;
+
+                  b = sqrt(bx*bx + by*by + bz*bz);
+
+                  bx = bx / b;
+                  by = by / b;
+                  bz = bz / b;
+
+                } else if(omega > 0) {
+                  bx = omegax / omega;
+                  by = omegay / omega;
+                  bz = omegaz / omega;
+
+                  tx = by*nz - bz*ny;
+                  ty = -bx*nz + bz*nx;
+                  tz = bx*ny - by*nx;
+
+                  t = sqrt(tx*tx + ty*ty + tz*tz);
+
+                  tx = tx / t;
+                  ty = ty / t;
+                  tz = tz / t;
+                } else {
+                  tx = 1.;
+                  ty = 0.;
+                  tz = 0.;
+
+                  bx = ny*tz - nz*ty;
+                  by = -nx*tz + nz*tx;
+                  bz = nx*ty - ny*tx;
+
+                  b = sqrt(bx*bx + by*by + bz*bz);
+
+                  bx = bx / b;
+                  by = by / b;
+                  bz = bz / b;
+                }
+
+                opB = 1 + B;
+
+                ocrossnx = omegay*nz - omegaz*ny;
+                ocrossny = -omegax*nz + omegaz*nx;
+                ocrossnz = omegax*ny - omegay*nx;
+
+                utcrossnx = uty*nz - utz*ny;
+                utcrossny = -utx*nz + utz*nx;
+                utcrossnz = utx*ny - uty*nx;
+
+                if(h < hN && h > 0) {
+                  if(h < eps*parts[i].r) h = eps*parts[i].r;
+                  ah = ai/h - ai/hN;
+                  lnah = log(hN/h);
+                  Fnx = -1. * B*B / (opB*opB) * ah
+                    - B*(1.+7.*B+B*B)/(5.*opB*opB*opB)*lnah;
+                  Fny = Fnx;
+                  Fnz = Fnx;
+                  Fnx *= 6.*PI*mu*ai*unx;
+                  Fny *= 6.*PI*mu*ai*uny;
+                  Fnz *= 6.*PI*mu*ai*unz;
+
+                  Ftx = -6.*PI*mu*ai*utx*4.*B*(2.+B+2.*B*B)
+                    /(15.*opB*opB*opB)*lnah;
+                  Fty = -6.*PI*mu*ai*uty*4.*B*(2.+B+2.*B*B)
+                    /(15.*opB*opB*opB)*lnah;
+                  Ftz = -6.*PI*mu*ai*utz*4.*B*(2.+B+2.*B*B)
+                    /(15.*opB*opB*opB)*lnah;
+                  Ftx += 8.*PI*mu*ai*ai*ocrossnx*B*(4.+B)/(10.*opB*opB)*lnah;
+                  Fty += 8.*PI*mu*ai*ai*ocrossny*B*(4.+B)/(10.*opB*opB)*lnah;
+                  Ftz += 8.*PI*mu*ai*ai*ocrossnz*B*(4.+B)/(10.*opB*opB)*lnah;
+
+                  Lox = -8.*PI*mu*ai*ai*utcrossnx*B*(4.+B)/(10.*opB*opB)*lnah;
+                  Loy = -8.*PI*mu*ai*ai*utcrossny*B*(4.+B)/(10.*opB*opB)*lnah;
+                  Loz = -8.*PI*mu*ai*ai*utcrossnz*B*(4.+B)/(10.*opB*opB)*lnah;
+                  Lox += -8.*PI*mu*ai*ai*ai*omegax*2.*B/(5.*opB)*lnah;
+                  Loy += -8.*PI*mu*ai*ai*ai*omegay*2.*B/(5.*opB)*lnah;
+                  Loz += -8.*PI*mu*ai*ai*ai*omegaz*2.*B/(5.*opB)*lnah;
+                } else {
+                  ah = 0;
+                  lnah = 0;
+                  Fnx = 0;
+                  Fny = 0;
+                  Fnz = 0;
+                  Ftx = 0;
+                  Fty = 0;
+                  Ftz = 0;
+                  Lox = 0;
+                  Loy = 0;
+                  Loz = 0;
+                }
+
+          /** TODO implement variable alpha damping as is done for the walls **/
+                if(h < 0) {
+                  ah = 0;
+                  lnah = 0;
+                  real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)
+                    /parts[i].E
+                    + (1-parts[j].sigma*parts[j].sigma)/parts[j].E)
+                    *sqrt(1./ai + 1./aj);
+                    
+                  Fnx = (sqrt(-h*h*h)/denom
+                    - sqrt(4./3.*PI*ai*ai*ai*parts[i].rho/denom*sqrt(-h))*udotn)
+                    *nx;
+                  Fny = (sqrt(-h*h*h)/denom
+                    - sqrt(4./3.*PI*ai*ai*ai*parts[i].rho/denom*sqrt(-h))*udotn)
+                    *ny;
+                  Fnz = (sqrt(-h*h*h)/denom
+                    - sqrt(4./3.*PI*ai*ai*ai*parts[i].rho/denom*sqrt(-h))*udotn)
+                    *nz;
+
+                }
+
+                // assign forces
+                parts[i].iFx += Fnx + Ftx;
+                parts[i].iFy += Fny + Fty;
+                parts[i].iFz += Fnz + Ftz;
+                parts[i].iLx += Lox;
+                parts[i].iLy += Loy;
+                parts[i].iLz += Loz;
+              }
+            }
+          }
+        }
       }
     }
   }
 }
 
 __global__ void collision_walls(dom_struct *dom, part_struct *parts,
-  int nparts, BC bc, real eps, real mu)
+  int nparts, BC bc, real eps, real mu, real rhof, real nu,
+  int interactionLength, real dt)
 {
   int i = threadIdx.x + blockIdx.x*blockDim.x;
   /**** parallelize this further by using a CUDA block for each wall ****/
@@ -2574,21 +2797,24 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
 
     real ai = parts[i].r;
     real h = 0;
-    real hN = 2.*(parts[i].rs - parts[i].r);
+    real hN = interactionLength;
     real ah, lnah;
 
     real Fnx, Fny, Fnz, Ftx, Fty, Ftz;
     real Lox, Loy, Loz;
 
+    int isTrue = 0;
+
     // west wall
-    dx = fabs(parts[i].x - dom->xs);
+    dx = fabs(parts[i].x - (dom->xs + bc.dsW));
     h = dx - ai;
+    isTrue = (bc.pW == NEUMANN); // collision force applied ifTrue
     if(h < hN && h > 0) {
+      Un = parts[i].u - bc.uWD;
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
-      Un = parts[i].u - bc.uWD;
       Utx = 0.;
       Uty = parts[i].v - bc.vWD;
       Utz = parts[i].w - bc.wWD;
@@ -2614,30 +2840,48 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += -8.*PI*mu*ai*ai*ai*omy*2./5.*lnah;
       Loz += -8.*PI*mu*ai*ai*ai*omz*2./5.*lnah;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.uW == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.uW == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.uW == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.uW == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.uW == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.uW == DIRICHLET) * Loz;
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
+
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     }
     if(h < 0) {
-      ah = h;
+      Un = parts[i].u - bc.uWD;
+
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       /** for now, use particle material as wall materal in second V term **/
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFx += (bc.uW == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFx += isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
 
     // east wall
-    dx = fabs(parts[i].x - dom->xe);
+    dx = fabs(parts[i].x - (dom->xe - bc.dsE));
     h = dx - ai;
+    isTrue = (bc.pE == NEUMANN);
     if(h < hN && h > 0) {
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
       Un = parts[i].u - bc.uED;
       Utx = 0.;
@@ -2665,30 +2909,48 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += -8.*PI*mu*ai*ai*ai*omy*2./5.*lnah;
       Loz += -8.*PI*mu*ai*ai*ai*omz*2./5.*lnah;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.uE == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.uE == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.uE == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.uE == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.uE == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.uE == DIRICHLET) * Loz;
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
+
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     } 
     if(h < 0) {
-      ah = h;
+      Un = -(parts[i].u - bc.uED);
+
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       /** for now, use particle material as wall materal in second V term **/
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFx -= (bc.uE == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFx -= isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
 
     // south wall
-    dy = fabs(parts[i].y - dom->ys);
+    dy = fabs(parts[i].y - (dom->ys + bc.dsS));
     h = dy - ai;
+    isTrue = (bc.pS == NEUMANN);
     if(h < hN && h > 0) {
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
       Un = parts[i].v - bc.vSD;
       Utx = parts[i].u - bc.uSD;
@@ -2716,30 +2978,48 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += 0.;
       Loz += -8.*PI*mu*ai*ai*ai*omz*2./5.*lnah;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.vS == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.vS == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.vS == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.vS == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.vS == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.vS == DIRICHLET) * Loz;
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
+
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     }
     if(h < 0) {
-      ah = h;
+      Un = parts[i].v - bc.vSD;
+
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       /** for now, use particle material as wall materal in second V term **/
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFy += (bc.vS == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFy += isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
 
     // north wall
-    dy = fabs(parts[i].y - dom->ye);
+    dy = fabs(parts[i].y - (dom->ye - bc.dsN));
     h = dy - ai;
+    isTrue = (bc.pN == NEUMANN);
     if(h < hN && h > 0) {
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
       Un = parts[i].v - bc.vND;
       Utx = parts[i].u - bc.uND;
@@ -2767,30 +3047,48 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += 0.;
       Loz += -8.*PI*mu*ai*ai*ai*omz*2./5.*lnah;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.vN == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.vN == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.vN == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.vN == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.vN == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.vN == DIRICHLET) * Loz;
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
+
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     }
     if(h < 0) {
-      ah = h;
+      Un = -(parts[i].v - bc.vND);
+
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       /** for now, use particle material as wall materal in second V term **/
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFy -= (bc.vN == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFy -= isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
 
     // bottom wall
-    dz = fabs(parts[i].z - dom->zs);
+    dz = fabs(parts[i].z - (dom->zs + bc.dsB));
     h = dz - ai;
+    isTrue = (bc.pB == NEUMANN);
     if(h < hN && h > 0) {
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
       Un = parts[i].w - bc.wBD;
       Utx = parts[i].u - bc.uBD;
@@ -2818,30 +3116,48 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += -8.*PI*mu*ai*ai*ai*omy*2./5.*lnah;
       Loz += 0.;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.wB == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.wB == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.wB == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.wB == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.wB == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.wB == DIRICHLET) * Loz;
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
+
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     }
     if(h < 0) {
-      ah = h;
+      Un = parts[i].w - bc.wBD;
+
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFz += (bc.wB == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFz += isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
 
     // top wall
-    dz = fabs(parts[i].z - dom->ze);
+    dz = fabs(parts[i].z - (dom->ze - bc.dsT));
     h = dz - ai;
+    isTrue = (bc.pT == NEUMANN);
     if(h < hN && h > 0) {
       if(h < eps*parts[i].r) h = eps*parts[i].r;
       ah = ai/h - ai/hN;
-      lnah = log(ai/h);
+      lnah = log(hN/h);
 
       Un = parts[i].w - bc.wTD;
       Utx = parts[i].u - bc.uTD;
@@ -2869,68 +3185,39 @@ __global__ void collision_walls(dom_struct *dom, part_struct *parts,
       Loy += -8.*PI*mu*ai*ai*ai*omy*2./5.*lnah;
       Loz += 0.;
 
-      ah = 1./h - 1./eps;
-      parts[i].iFx += (bc.wT == DIRICHLET) * (Fnx + Ftx);
-      parts[i].iFy += (bc.wT == DIRICHLET) * (Fny + Fty);
-      parts[i].iFz += (bc.wT == DIRICHLET) * (Fnz + Ftz);
-      parts[i].iLx += (bc.wT == DIRICHLET) * Lox;
-      parts[i].iLy += (bc.wT == DIRICHLET) * Loy;
-      parts[i].iLz += (bc.wT == DIRICHLET) * Loz;
-    }
-    if(h < 0) {
-      ah = h;
-      lnah = 0;
-      // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFz -= (bc.wT == DIRICHLET) * sqrt(-ah*ah*ah)/denom;
-    }
-/*
-    // south wall
-    h = parts[i].y - (dom->ys + 1.5*parts[i].r);
-    if(h < 0) {
-      ah = 0;
-      lnah = 0;
-      // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFy += (bc.vS == DIRICHLET) * sqrt(-h*h*h)/denom;
-    }
+      parts[i].iFx += isTrue * (Fnx + Ftx);
+      parts[i].iFy += isTrue * (Fny + Fty);
+      parts[i].iFz += isTrue * (Fnz + Ftz);
+      parts[i].iLx += isTrue * Lox;
+      parts[i].iLy += isTrue * Loy;
+      parts[i].iLz += isTrue * Loz;
 
-    // north wall
-    h = parts[i].y - (dom->ye - 1.5*parts[i].r);
-    if(h < 0) {
-      ah = 0;
-      lnah = 0;
-      // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFy += -(bc.vN == DIRICHLET) * sqrt(-h*h*h)/denom;
+      // if no contact, mark with a -1
+      parts[i].St = -1.;
     }
-*/
-/*
-    // bottom wall
-    h = parts[i].z - (dom->zs + 3.*parts[i].r);
     if(h < 0) {
-      ah = 0;
-      lnah = 0;
-      // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFz += (bc.wB == DIRICHLET) * sqrt(-h*h*h)/denom;
-    }
+      Un = -(parts[i].w - bc.wTD);
 
-    // top wall
-    h = parts[i].z - (dom->ze - 3.*parts[i].r);
-    if(h < 0) {
-      ah = 0;
+      // if this is the first time step with contact, set St
+      // otherwise, use St that was set at the beginning of the contact
+      if(parts[i].St == -1.) {
+        parts[i].St = 1./9.*parts[i].rho/rhof*2.*parts[i].r*abs(Un)/nu;
+      }
       lnah = 0;
       // for now, use particle material as wall materal in second V term //
-      real denom = 0.75*((1-parts[i].sigma*parts[i].sigma)/parts[i].E
-        + (1-parts[i].sigma*parts[i].sigma)/parts[i].E)*sqrt(1./ai);
-      parts[i].iFz += -(bc.wT == DIRICHLET) * sqrt(-h*h*h)/denom;
+      real k = 4./3./((1.-parts[i].sigma*parts[i].sigma)/parts[i].E
+        + (1.-parts[i].sigma*parts[i].sigma)/parts[i].E)/sqrt(1./ai);
+
+      // estimate alpha according to Tsuji (1991) p. 32 and Joseph (2000) p. 344
+      real xcx0 = parts[i].l_rough/(2.*parts[i].r)*100.;
+      real e = parts[i].e_dry + (1.+parts[i].e_dry)/parts[i].St*log(xcx0);
+      if(e < 0) e = 0;
+      real alpha = -2.263*pow(e,0.3948)+2.22;
+
+      real eta = alpha*sqrt(4./3.*PI*ai*ai*ai*parts[i].rho*k*sqrt(-h));
+
+      parts[i].iFz -= isTrue * (sqrt(-h*h*h)*k - eta*Un);
     }
-*/
   }
 }
 
@@ -2954,11 +3241,6 @@ __global__ void spring_parts(part_struct *parts, int nparts)
     real dx = parts[i].x-parts[i].spring_x-lx;
     real dy = parts[i].y-parts[i].spring_y-ly;
     real dz = parts[i].z-parts[i].spring_z-lz;
-//printf("\n(lx, ly, lz) = (%e, %e, %e)   l = %e\n", lx, ly, lz, l);
-//printf("\n(dx, dy, dz) = (%e, %e, %e)\n", dx, dy, dz);
-    //real dx = parts[i].x-parts[i].spring_x;
-    //real dy = parts[i].y-parts[i].spring_y;
-    //real dz = parts[i].z-parts[i].spring_z;
 
     parts[i].kFx = - parts[i].spring_k * dx;
     parts[i].kFy = - parts[i].spring_k * dy;
@@ -3227,6 +3509,123 @@ __global__ void energy_multiply(real *u_co, real *v_co, real *w_co, real *co,
     for(int i = dom->Gcc.is-DOM_BUF; i < dom->Gcc.ie-DOM_BUF; i++) {
       C = i + tj*dom->Gcc.s1 + tk*dom->Gcc.s2;
       co[C] = u_co[C]*u_co[C] + v_co[C]*v_co[C] + w_co[C]*w_co[C];
+    }
+  }
+}
+
+__device__ real ab_int(real dt0, real dt, real f0, real df0, real df)
+{
+  real DT = dt/dt0;
+  if(dt0 < 0) 
+    return f0 + df*dt;
+  else
+    return f0 + ((1+0.5*DT)*df - 0.5*DT*df0)*dt;
+}
+
+__global__ void internal_u(real *u, part_struct *parts, dom_struct *dom,
+  int *flag_u, int *phase)
+{
+  int tj = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
+  int tk = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
+
+  if(tj < dom->Gfx._je && tk < dom->Gfx._ke) {
+    for(int i = dom->Gfx._is; i < dom->Gfx._ie; i++) {
+      int C = i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b;
+      int W = (i-1) + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      int E = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+
+      int pw = phase[W];
+      int pe = phase[E];
+      int f = flag_u[C];
+
+      int p = (pw > -1 && pe > -1) * phase[E];
+
+      real rx = (i - DOM_BUF) * dom->dx + dom->xs - parts[p].x;
+      if(rx < dom->xs - 0.5*dom->dx) rx += dom->xl;
+      if(rx > dom->xe + 0.5*dom->dx) rx -= dom->xl;
+      real ry = (tj - 0.5) * dom->dy + dom->ys - parts[p].y;
+      if(ry < dom->ys - 0.5*dom->dy) ry += dom->yl;
+      if(ry > dom->ye + 0.5*dom->dy) ry -= dom->yl;
+      real rz = (tk - 0.5) * dom->dz + dom->zs - parts[p].z;
+      if(rz < dom->zs - 0.5*dom->dz) rz += dom->zl;
+      if(rz > dom->ze + 0.5*dom->dz) rz -= dom->zl;
+
+      real ocrossr_x = parts[p].oy*rz - parts[p].oz*ry;
+
+      u[C] = (pw == -1 || pe == -1 || f == -1) * u[C]
+        + (pw > -1 && pe > -1 && f != -1) * (ocrossr_x + parts[p].u);
+    }
+  }
+}
+
+__global__ void internal_v(real *v, part_struct *parts, dom_struct *dom,
+  int *flag_v, int *phase)
+{
+  int tk = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
+  int ti = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
+
+  if(tk < dom->Gfy._ke && ti < dom->Gfy._ie) {
+    for(int j = dom->Gfy._js; j < dom->Gfy._je; j++) {
+      int C = ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b;
+      int S = ti + (j-1)*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      int N = ti + j*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+
+      int ps = phase[S];
+      int pn = phase[N];
+      int f = flag_v[C];
+
+      int p = (ps > -1 && pn > -1) * phase[N];
+
+      real rx = (ti - 0.5) * dom->dx + dom->xs - parts[p].x;
+      if(rx < dom->xs - 0.5*dom->dx) rx += dom->xl;
+      if(rx > dom->xe + 0.5*dom->dx) rx -= dom->xl;
+      real ry = (j - DOM_BUF) * dom->dy + dom->ys - parts[p].y;
+      if(ry < dom->ys - 0.5*dom->dy) ry += dom->yl;
+      if(ry > dom->ye + 0.5*dom->dy) ry -= dom->yl;
+      real rz = (tk - 0.5) * dom->dz + dom->zs - parts[p].z;
+      if(rz < dom->zs - 0.5*dom->dz) rz += dom->zl;
+      if(rz > dom->ze + 0.5*dom->dz) rz -= dom->zl;
+
+      real ocrossr_y = parts[p].oz*rx - parts[p].ox*rz;
+
+      v[C] = (ps == -1 || pn == -1 || f == -1) * v[C]
+        + (ps > -1 && pn > -1 && f != -1) * (ocrossr_y + parts[p].v);
+    }
+  }
+}
+
+__global__ void internal_w(real *w, part_struct *parts, dom_struct *dom,
+  int *flag_w, int *phase)
+{
+  int ti = blockIdx.x * blockDim.x + threadIdx.x + DOM_BUF;
+  int tj = blockIdx.y * blockDim.y + threadIdx.y + DOM_BUF;
+
+  if(ti < dom->Gfz._ie && tj < dom->Gfz._je) {
+    for(int k = dom->Gfz._ks; k < dom->Gfz._ke; k++) {
+      int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
+      int B = ti + tj*dom->Gcc._s1b + (k-1)*dom->Gcc._s2b;
+      int T = ti + tj*dom->Gcc._s1b + k*dom->Gcc._s2b;
+
+      int pb = phase[B];
+      int pt = phase[T];
+      int f = flag_w[C];
+
+      int p = (pb > -1 && pt > -1) * phase[T];
+
+      real rx = (ti - 0.5) * dom->dx + dom->xs - parts[p].x;
+      if(rx < dom->xs - 0.5*dom->dx) rx += dom->xl;
+      if(rx > dom->xe + 0.5*dom->dx) rx -= dom->xl;
+      real ry = (tj - 0.5) * dom->dy + dom->ys - parts[p].y;
+      if(ry < dom->ys - 0.5*dom->dy) ry += dom->yl;
+      if(ry > dom->ye + 0.5*dom->dy) ry -= dom->yl;
+      real rz = (k - DOM_BUF) * dom->dz + dom->zs - parts[p].z;
+      if(rz < dom->zs - 0.5*dom->dz) rz += dom->zl;
+      if(rz > dom->ze + 0.5*dom->dz) rz -= dom->zl;
+
+      real ocrossr_z = parts[p].ox*ry - parts[p].oy*rx;
+
+      w[C] = (pb == -1 || pt == -1 || f == -1) * w[C]
+        + (pb > -1 && pt > -1 && f != -1) * (ocrossr_z + parts[p].w);
     }
   }
 }

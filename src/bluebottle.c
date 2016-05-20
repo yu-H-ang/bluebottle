@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -35,9 +35,11 @@ dom_struct **_dom;
 dom_struct Dom;
 real *p0;
 real *p;
+real *phi;
 //real *divU;
 real **_p0;
 real **_p;
+real **_phi;
 //real **_divU;
 real *u;
 real *u0;
@@ -57,12 +59,14 @@ real *f_z;
 real **_f_x;
 real **_f_y;
 real **_f_z;
+#ifndef IMPLICIT
 real *diff0_u;
 real *diff0_v;
 real *diff0_w;
 real **_diff0_u;
 real **_diff0_v;
 real **_diff0_w;
+#endif
 real *conv0_u;
 real *conv0_v;
 real *conv0_w;
@@ -108,6 +112,9 @@ real **_w_BT;
 real **_rhs_p;
 real duration;
 real ttime;
+real vel_tDelay;
+real p_tDelay;
+real g_tDelay;
 real dt;
 real dt0;
 real CFL;
@@ -122,12 +129,18 @@ int stepnum;
 int rec_flow_field_stepnum_out;
 int rec_paraview_stepnum_out;
 int rec_particle_stepnum_out;
-int rec_precursor_stepnum_out;
+int rec_prec_stepnum_out;
+int rec_prec_flow_field_stepnum_out;
 real rec_flow_field_dt;
 real rec_flow_field_ttime_out;
 int rec_flow_field_vel;
 int rec_flow_field_p;
 int rec_flow_field_phase;
+real rec_prec_flow_field_dt;
+real rec_prec_flow_field_ttime_out;
+int rec_prec_flow_field_vel;
+int rec_prec_flow_field_p;
+int rec_prec_flow_field_phase;
 real rec_paraview_dt;
 real rec_paraview_ttime_out;
 real rec_particle_dt;
@@ -135,8 +148,8 @@ real rec_particle_ttime_out;
 real rec_restart_dt;
 int rec_restart_stop;
 real rec_restart_ttime_out;
-real rec_precursor_dt;
-real rec_precursor_ttime_out;
+real rec_prec_dt;
+real rec_prec_ttime_out;
 int rec_particle_pos;
 int rec_particle_a;
 int rec_particle_vel;
@@ -181,18 +194,22 @@ real **_nextnumden;
 real **_w_b;
 real **_ter_cell;
 real **_f_z_coupling_numden;
-real *numGau;
-real **_numGau;
-real **_numGau_temp;
-real *masGau;
-real **_masGau;
-real **_masGau_temp;
+//real *numGau;
+//real **_numGau;
+//real **_numGau_temp;
+//real *masGau;
+//real **_masGau;
+//real **_masGau_temp;
 BubGen_struct BubbleGenerator;
 real *BGndot;
 real **_BGndot;
 real *BGmdot;
 real **_BGmdot;
 real TerminalVelocityLimit;
+bubble_struct *bub_gen_pos;
+real *Ix;
+real *Iy;
+real *Iz;
 
 // concentration equation
 real concen_diff;
@@ -230,6 +247,7 @@ real pressure_atm;
 real rho_atm;
 real grav_acc;
 int turb_switch;
+int quiescent_fluid;
 //##############################################################################
 
 int main(int argc, char *argv[]) {
@@ -260,14 +278,6 @@ int main(int argc, char *argv[]) {
     int argin;
     int runseeder = 0;
     int runrestart = 0;
-    int NP = 0;
-    real radius = -1.;
-    real density = -1.;
-    real YoungsModulus = -1.;
-    real PoissonsRatio = -1.;
-    int order = -1.;
-    int translating = -1;
-    int rotating = -1;
     while(--argc > 0 && (*++argv)[0] == '-') {
       while((argin = *++argv[0])) {
         switch(argin) {
@@ -287,47 +297,19 @@ int main(int argc, char *argv[]) {
       }
     }
     
-    NP = 0;
-    radius = -1.;
-    order = -1.;
     if(runseeder == 1) {
-      if(argc != 8) {
-        printf("Usage: bluebottle -s N a d E s o t r\n");
-        printf("       N is the number of particles\n");
-        printf("       a is the particle radius\n");
-        printf("       d is the particle density (rho)\n");
-        printf("       E is the particle Young's modulus\n");
-        printf("       s is the particle Poisson's ratio (-1 < s <= 0.5)\n");
-        printf("       o is the Lamb's solution truncation order\n");
-        printf("       t = 1 if particles can translate (0 if not)\n");
-        printf("       r = 1 if particles can rotate (0 if not)\n");
+      printf("Seed particles according to parameters specified in");
+      printf(" parts.config? (y/N)\n");
+      fflush(stdout);
+      int c = getchar();
+      if (c == 'Y' || c == 'y') {
+        seeder_read_input();
+        return EXIT_SUCCESS;
+      } else {
+        printf("Please specify the desired parameters in parts.config\n\n");
+        fflush(stdout);
         return EXIT_FAILURE;
       }
-      NP = atoi(argv[0]);
-      radius = atof(argv[1]);
-      density = atof(argv[2]);
-      YoungsModulus = atof(argv[3]);
-      PoissonsRatio = atof(argv[4]);
-      order = atoi(argv[5]);
-      translating = atoi(argv[6]);
-      rotating = atoi(argv[7]);
-      if(NP < 1 || radius < 0 || density < 0
-        || YoungsModulus < 0 || PoissonsRatio == -1 || PoissonsRatio > 0.5
-        || order < 0 || translating > 1 || rotating > 1) {
-        printf("Usage: bluebottle -s N a d o t r\n");
-        printf("       N is the number of particles\n");
-        printf("       a is the particle radius\n");
-        printf("       d is the particle density (rho)\n");
-        printf("       E is the particle Young's modulus\n");
-        printf("       s is the particle Poisson's ratio (-1 < s <= 0.5)\n");
-        printf("       o is the Lamb's solution truncation order\n");
-        printf("       t = 1 if particles can translate (0 if not)\n");
-        printf("       r = 1 if particles can rotate (0 if not)\n");
-        return EXIT_FAILURE;
-      }
-      seeder(NP, radius, density, YoungsModulus, PoissonsRatio, order,
-        translating, rotating);
-      return EXIT_SUCCESS;
     } else if(runrestart == 1 && argc > 0) {
       printf("Usage restart simulation: bluebottle -r\n");
       return EXIT_FAILURE;
@@ -342,16 +324,14 @@ int main(int argc, char *argv[]) {
       // read simulation input configuration file
       printf("\nRunning bluebottle_0.1...\n\n");
       printf("Reading the domain and particle input files...\n\n");
-      fflush(stdout);
       domain_read_input();
       parts_read_input(turb);
       //########################################################################
       // read config info
       Eulerian_read_input();
       //########################################################################
-      printf("done.\n");
       fflush(stdout);
-      //printf("FLOW: Using devices %d through %d.\n\n", dev_start, dev_end);
+      //printf("EXPD: Using devices %d through %d.\n\n", dev_start, dev_end);
       //fflush(stdout);
 
       /********* Messy hack for taking advantage of CUDA_VISIBLE_DEVICES
@@ -390,17 +370,24 @@ int main(int argc, char *argv[]) {
 
       if(runrestart != 1) {
         // start BICGSTAB recorder
-        recorder_bicgstab_init("solver_flow.rec");
-        // start Helmholtz recorder
-        //recorder_bicgstab_init("solver_helmholtz_flow.rec");
+        recorder_bicgstab_init("solver_expd.rec");
+        #ifdef IMPLICIT
+          // start Helmholtz recorder
+          recorder_bicgstab_init("solver_helmholtz_expd.rec");
+        #endif
         // start Lamb's coefficient recorder
-        recorder_lamb_init("lamb.rec");
+        // commented out because it should now automatically init itself
+        // from recorder_lamb(...) if the file doesn't already exist
+        //recorder_lamb_init("lamb.rec");
       }
 
       // initialize the domain
       printf("Initializing domain variables...");
       fflush(stdout);
-      int domain_init_flag = domain_init_Eulerian();//##########################
+      int domain_init_flag = domain_init();
+      //########################################################################
+      turbulence_init_Eulerian();
+      //########################################################################
       printf("done.\n");
       fflush(stdout);
       if(domain_init_flag == EXIT_FAILURE) {
@@ -422,7 +409,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
       }
       //########################################################################
-
+      
       // set up the boundary condition config info to send to precursor
       expd_init_BC(np);
 
@@ -430,13 +417,17 @@ int main(int argc, char *argv[]) {
       printf("Initializing particle variables...");
       fflush(stdout);
       int parts_init_flag = parts_init();
+      int binDom_init_flag = binDom_init();
       printf("done.\n");
       fflush(stdout);
       if(parts_init_flag == EXIT_FAILURE) {
         printf("\nThe initial particle configuration is not allowed.\n");
         return EXIT_FAILURE;
+      } else if(binDom_init_flag == EXIT_FAILURE) {
+        printf("\nThe bin configuration is not allowed.\n");
+        return EXIT_FAILURE;
       }
-      
+
       // allocate device memory
       printf("Allocating domain CUDA device memory...");
       fflush(stdout);
@@ -472,7 +463,7 @@ int main(int argc, char *argv[]) {
       cuda_Eulerian_push();
       printf("...done.\n");
       //########################################################################
-      
+
       count_mem();
 
       // initialize ParaView VTK output PVD file
@@ -523,9 +514,7 @@ int main(int argc, char *argv[]) {
       Eulerian_show_config();
       //domain_show_config();
       //########################################################################
-      
-      
-      /*
+
       #ifdef DEBUG
         // write config to screen
         printf("\n=====DEBUG");
@@ -536,11 +525,11 @@ int main(int argc, char *argv[]) {
         cuda_part_pull();
         domain_show_config();
         parts_show_config();
+        bin_show_config();
         printf("========================================");
         printf("========================================\n\n");
         fflush(stdout);
       #endif
-      */
 
       #ifdef TEST // run test code
         // ** note that some of these work only for DEV RANGE 0 0 **
@@ -556,14 +545,14 @@ int main(int argc, char *argv[]) {
         rec_paraview_stepnum_out = -1;
         rec_particle_stepnum_out = -1;
         //rec_restart_stepnum_out = -1;
-        rec_precursor_stepnum_out = -1;
+        rec_prec_stepnum_out = -1;
         cuda_part_pull();
         //cuda_BC_test();
         //cuda_U_star_test_exp();
-        cuda_U_star_test_cos();
+        //cuda_U_star_test_cos();
         //cuda_project_test();
         //cuda_quad_interp_test();
-        //cuda_lamb_test();
+        cuda_lamb_test();
         printf("========================================");
         printf("========================================\n\n");
         fflush(stdout);
@@ -576,7 +565,7 @@ int main(int argc, char *argv[]) {
         fflush(stdout);
 
         // get initial dt; this is an extra check for the SHEAR initialization
-        dt = cuda_find_dt();
+        dt = cuda_Eulerian_find_dt();
 
         // share this with the precursor domain
         expd_compare_dt(np, status);
@@ -588,6 +577,10 @@ int main(int argc, char *argv[]) {
         if(nparts > 0) {
           cuda_part_BC();
         }
+        cuda_dom_BC();
+
+        // write particle internal flow equal to solid body velocity
+        cuda_parts_internal();
         cuda_dom_BC();
         //######################################################################
         // apply BC all fields in Eulerian branch
@@ -642,7 +635,7 @@ int main(int argc, char *argv[]) {
 
         #endif
         }
-        
+
         /******************************************************************/
         /** Begin the main timestepping loop in the experimental domain. **/
         /******************************************************************/
@@ -653,28 +646,35 @@ int main(int argc, char *argv[]) {
           rec_particle_ttime_out += dt;
           rec_restart_ttime_out += dt;
           stepnum++;
-          printf("FLOW: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
+          printf("EXPD: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
           fflush(stdout);
           
           // Eulerian branch! Everything is explicitly computed
           //####################################################################
+          // bubble injection analogous to lagrangian method
+          if(BubbleGenerator.BubGen_type == HYPERBOLICTAN_RANDOM) {
+			  cuda_compute_HYPERBOLICTANRANDOM();
+		  }
           
-          // calculate cell-centered bubble diameters, then cell-centered
+          // Calculate cell-centered bubble diameters, then cell-centered
           // terminal velocity, then add it to fluid velocity field,
-          // get bubble velocity.
+          // get bubble velocity. 
           cuda_add_terminal_velz();
+          // zero-Dirichlet BC at bottom
+          cuda_botbubbvel_BC();
           
           // compute mass transfer rate, all values are at cell centers, bubble
           // diameters are needed, they are already calculated above.
           cuda_compute_mdot();
           
-          //advance three equations
-          //cuda_num_mas_BC_compute(); Amplitude gradually enhanced on boundary
-          
           // number density equation
           cuda_numberdensity_march();
           // NOTE!: upwinding BC
           cuda_numberdensity_BC();
+          //output total bubble number
+          //cuda_Eulerian_pull();
+          //compute_total_number();
+          //cuda_numberdensity_compute_totalnumden();
           
           // concentration equation
           cuda_concentration_march();
@@ -689,7 +689,7 @@ int main(int argc, char *argv[]) {
           // compute face-centered bubble diameter, note that we need to
           // re-calculate cell-centered bubble diameters and bubble velocity.
           cuda_add_terminal_velz();
-          cuda_coupling_force_preparation();
+          //cuda_coupling_force_preparation();
           
           // compute coupling force
           cuda_compute_coupling_force();
@@ -699,62 +699,62 @@ int main(int argc, char *argv[]) {
               cuda_compute_turb_forcing();
           }
           //####################################################################
-          
-          cuda_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);
+
+          //####################################################################
+          cuda_Eulerian_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);
+          //####################################################################
           compute_vel_BC();
-          
           // update the boundary condition config info and share with precursor
           expd_update_BC(np, status);
-          
+
           // TODO: save work by rebuilding only the cages that need to be rebuilt
           cuda_build_cages();
-          
+
           int iter = 0;
           real iter_err = FLT_MAX;
+
           while(iter_err > lamb_residual) {  // iterate for Lamb's coefficients
-            /*##################################################################
             #ifndef BATCHRUN
               printf("  Iteration %d: ", iter);
               fflush(stdout);
             #endif
-            ##################################################################*/
 
             // solve for U_star
-            cuda_U_star_2();
-/*          IMPLICIT FORMULATION (only PERIODIC BC implemented)
-            cuda_ustar_helmholtz(rank);
-            cuda_vstar_helmholtz(rank);
-            cuda_wstar_helmholtz(rank);
-*/
+            #ifndef IMPLICIT
+              cuda_U_star_2();
+            #else
+              cuda_ustar_helmholtz(rank);
+              cuda_vstar_helmholtz(rank);
+              cuda_wstar_helmholtz(rank);
+            #endif
+
             // apply boundary conditions to U_star
-            /*
             if(nparts > 0) {
               cuda_part_BC_star();
             }
-            */
             cuda_dom_BC_star();
             // enforce solvability condition
             cuda_solvability();
-            /*
             if(nparts > 0) {
               cuda_part_BC_star();
             }
-            */
             cuda_dom_BC_star();
             // solve for pressure
             cuda_PP_bicgstab(rank);
-            cuda_dom_BC_p();
+            cuda_dom_BC_phi();
             // solve for U
             cuda_project();
             // apply boundary conditions to field variables
-            /*
             if(nparts > 0) {
               cuda_part_BC();
             }
-            */
             cuda_dom_BC();
             // update pressure
             cuda_update_p();
+            if(nparts > 0) {
+              cuda_part_BC();
+              cuda_part_p_fill();
+            }
             cuda_dom_BC_p();
 
             // update Lamb's coefficients
@@ -769,26 +769,31 @@ int main(int argc, char *argv[]) {
               iter_err = cuda_lamb_err();
               // TODO: write error to lamb.rec
             #endif
-            /*##################################################################
             #ifndef BATCHRUN
               printf("Error = %f\r", iter_err);
             #endif
-            ##################################################################*/
             iter++;
             // check iteration limit
             if(iter == lamb_max_iter) {
-              lambflag = !lambflag;
-              printf("Reached the maximum number of Lamb's");
-              printf(" coefficient iterations.");
-              printf(" Ending simulation.\n");
+              //lambflag = !lambflag;
+              //printf("Reached the maximum number of Lamb's");
+              //printf(" coefficient iterations.");
+              //printf(" CONTINUING simulation.\n");
               break;
             }
           }
-          /*####################################################################
+
           printf("  The Lamb's coefficients converged in");
           printf(" %d iterations.\n", iter);
-          ####################################################################*/
+
           if(!lambflag) {
+            // update particle position
+            cuda_move_parts();
+
+            // write particle internal flow equal to solid body velocity
+            cuda_parts_internal();
+            cuda_dom_BC();
+
             // store u, conv, and coeffs for use in next timestep
             cuda_store_u();
             if(nparts > 0)
@@ -797,12 +802,11 @@ int main(int argc, char *argv[]) {
             // compute div(U)
             //cuda_div_U();
 
-            // update particle position
-            cuda_move_parts();
-
             // compute next timestep size
             dt0 = dt;
-            dt = cuda_find_dt();
+            //##################################################################
+            dt = cuda_Eulerian_find_dt();
+            //##################################################################
 
             // compare this timestep size to that in the precursor and
             // and synchronize the result
@@ -811,7 +815,7 @@ int main(int argc, char *argv[]) {
           } else {
             return EXIT_FAILURE;
           }
-          
+
           //####################################################################
           // cgns output
           if(rec_flow_field_dt > 0) {
@@ -833,7 +837,6 @@ int main(int argc, char *argv[]) {
             }
           }
           //####################################################################
-          
           if(rec_paraview_dt > 0) {
             if(rec_paraview_ttime_out >= rec_paraview_dt) {
               // pull back data and write fields
@@ -886,21 +889,26 @@ int main(int argc, char *argv[]) {
           // write a restart file and exit when the time is appropriate
           timestepwalltime = time(NULL);
           diffwalltime = difftime(timestepwalltime, startwalltime);
-          if(rec_restart_dt > 0) {
-            if((real)diffwalltime/60. > rec_restart_dt) {
-              printf("  Writing restart file (t = %e)...", ttime);
-              fflush(stdout);
-              cuda_dom_pull();
-              cuda_part_pull();
-              cuda_Eulerian_pull();
-              out_restart_Eulerian();
-              printf("done.               \n");
-              fflush(stdout);
-              rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
-              startwalltime = time(NULL);
-              if(rec_restart_stop)
-                break; // exit!
-            }
+          int rest_com = (rec_restart_dt > 0)
+            && ((real)diffwalltime/60. > rec_restart_dt);
+
+          // communicate write restart with precursor domain
+          expd_comm_restart_write(np, rest_com);
+
+          if(rest_com) {
+            printf("  Writing restart file (t = %e)...", ttime);
+            fflush(stdout);
+            cuda_dom_pull();
+            cuda_part_pull();
+            //##################################################################
+            Eulerian_out_restart();
+            //##################################################################
+            printf("done.               \n");
+            fflush(stdout);
+            rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
+            startwalltime = time(NULL);
+            if(rec_restart_stop)
+              break; // exit!
           }
 
           // check for blow-up condition
@@ -909,17 +917,15 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
           }
         }
-        /******************************************************************/
-        /**The end of main timestepping loop in the experimental domain. **/
-        /******************************************************************/
-        
+
         if(rec_restart_dt > 0 && ttime >= duration && !restart_stop) {
           printf("  Writing final restart file (t = %e)...", ttime);
           fflush(stdout);
           cuda_dom_pull();
           cuda_part_pull();
-          cuda_Eulerian_pull();
-          out_restart_Eulerian();
+          //##################################################################
+          Eulerian_out_restart();
+          //##################################################################
           printf("done.               \n");
           fflush(stdout);
           rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
@@ -960,12 +966,12 @@ int main(int argc, char *argv[]) {
       domain_clean();
       printf("done.\n");
       fflush(stdout);
-      //################################################################
+      //########################################################################
       printf("Cleaning up variables for Eulerian branch...");
       fflush(stdout);
       Eulerian_clean();
       printf("done.\n");
-      //################################################################
+      //########################################################################
 
       printf("\n...bluebottle_0.1 done.\n\n");
     }
@@ -1000,7 +1006,7 @@ int main(int argc, char *argv[]) {
     turb_read_input();
     parts_read_input(turb);
 
-    //printf("TURB: Using devices %d through %d.\n\n", dev_start, dev_end);
+    //printf("PREC: Using devices %d through %d.\n\n", dev_start, dev_end);
     //fflush(stdout);
 
     /********* Messy hack for taking advantage of CUDA_VISIBLE_DEVICES
@@ -1043,7 +1049,11 @@ int main(int argc, char *argv[]) {
 
     if(runrestart != 1) {
       // start BICGSTAB recorder
-      recorder_bicgstab_init("solver_turb.rec");
+      recorder_bicgstab_init("solver_prec.rec");
+      #ifdef IMPLICIT
+        // start Helmholtz recorder
+        recorder_bicgstab_init("solver_helmholtz_prec.rec");
+      #endif
     }
 
     // initialize the domain
@@ -1059,8 +1069,12 @@ int main(int argc, char *argv[]) {
 
     // initialize the particles
     int parts_init_flag = parts_init();
+    int binDom_init_flag = binDom_init();
     if(parts_init_flag == EXIT_FAILURE) {
       printf("\nThe initial particle configuration is not allowed.\n");
+      return EXIT_FAILURE;
+    } else if(binDom_init_flag == EXIT_FAILURE) {
+      printf("\nThe bin configuration is not allowed.\n");
       return EXIT_FAILURE;
     }
 
@@ -1076,11 +1090,11 @@ int main(int argc, char *argv[]) {
     //count_mem();
 
     // initialize ParaView VTK output PVD file
-    if(rec_precursor_dt > 0) {
+    if(rec_prec_dt > 0) {
       init_VTK_turb();
     }
 
-    real rec_precursor_ttime_out = 0.;
+    real rec_prec_ttime_out = 0.;
     real rec_restart_ttime_out = 0.;
 
     cuda_build_cages();
@@ -1091,6 +1105,7 @@ int main(int argc, char *argv[]) {
       printf("\nRestart requested.\n\n");
       printf("Reading restart file...");
       fflush(stdout);
+      cgns_turb_grid();
       in_restart_turb();
       printf("done.\n");
       fflush(stdout);
@@ -1104,6 +1119,7 @@ int main(int argc, char *argv[]) {
       cuda_part_push();
       printf("done.\n");
       fflush(stdout);
+      cgns_grid();
     }
 
     // initialize timestep size since turbulent velocity is nonzero
@@ -1120,33 +1136,49 @@ int main(int argc, char *argv[]) {
     cuda_dom_BC();
 
     // write initial fields
-    if(rec_precursor_dt > 0) {
+    if(rec_prec_dt > 0 && runrestart != 1) {
       cuda_dom_pull();
       printf("Writing precursor file %d (t = %e)...",
-        rec_precursor_stepnum_out, ttime);
+        rec_prec_stepnum_out, ttime);
       fflush(stdout);
       out_VTK_turb();
-      rec_precursor_stepnum_out++;
+      rec_prec_stepnum_out++;
       printf("done.               \n");
       fflush(stdout);
     }
-
+    if(rec_prec_flow_field_dt > 0 && runrestart != 1) {
+      cuda_dom_pull();
+      printf("Writing turbulence flow field file t = %e...", ttime);
+      fflush(stdout);
+      cgns_turb_grid();
+      cgns_turb_flow_field(rec_prec_flow_field_dt);
+      rec_prec_flow_field_stepnum_out++;
+      printf("done.               \n");
+      fflush(stdout);
+    }
     /***************************************************************/
     /** Begin the main timestepping loop in the precursor domain. **/
     /***************************************************************/
     while(ttime <= duration) {
       ttime += dt;
-      rec_precursor_ttime_out += dt;
+      rec_prec_flow_field_ttime_out += dt;
+      rec_prec_ttime_out += dt;
       rec_restart_ttime_out += dt;
       stepnum++;
-      printf("TURB: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
+      printf("PREC: Time = %e of %e (dt = %e).\n", ttime, duration, dt);
 
       cuda_compute_forcing(&pid_int, &pid_back, Kp, Ki, Kd);
       cuda_compute_turb_forcing();
       compute_vel_BC();
 
       // solve for U_star
-      cuda_U_star_2();
+      #ifndef IMPLICIT
+        cuda_U_star_2();
+      #else
+        cuda_ustar_helmholtz(rank);
+        cuda_vstar_helmholtz(rank);
+        cuda_wstar_helmholtz(rank);
+      #endif
       // apply boundary conditions to U_star
       cuda_dom_BC_star();
       // force solvability condition
@@ -1154,7 +1186,7 @@ int main(int argc, char *argv[]) {
       cuda_dom_BC_star();
       // solve for pressure
       cuda_PP_bicgstab(rank);
-      cuda_dom_BC_p();
+      cuda_dom_BC_phi();
       // solve for U
       cuda_project();
       // apply boundary conditions to field variables
@@ -1178,14 +1210,14 @@ int main(int argc, char *argv[]) {
       // communicate the boundary condition with the experimental domain
       prec_send_BC(np, rank, status);
 
-      if(rec_precursor_dt > 0) {
-        if(rec_precursor_ttime_out >= rec_precursor_dt) {
+      if(rec_prec_dt > 0) {
+        if(rec_prec_ttime_out >= rec_prec_dt) {
           // pull back data and write fields
           cuda_dom_pull();
           #ifndef BATCHRUN
             printf("  Writing precursor output file");
             printf(" %d (t = %e)...                  \r",
-              rec_precursor_stepnum_out, ttime);
+              rec_prec_stepnum_out, ttime);
             fflush(stdout);
           #endif
           #ifdef DEBUG
@@ -1194,23 +1226,51 @@ int main(int argc, char *argv[]) {
             out_VTK_turb();
           #endif
           printf("  Writing precursor file %d (t = %e)...done.\n",
-            rec_precursor_stepnum_out, ttime);
-          rec_precursor_stepnum_out++;
+            rec_prec_stepnum_out, ttime);
+          rec_prec_stepnum_out++;
           fflush(stdout);
-          rec_precursor_ttime_out = rec_precursor_ttime_out - rec_precursor_dt;
+          rec_prec_ttime_out = rec_prec_ttime_out - rec_prec_dt;
         }
       }
-      if(rec_restart_dt > 0) {
-        if(rec_restart_ttime_out >= rec_restart_dt) {
-          printf("  Writing precursor restart file (t = %e)...", ttime);
-          fflush(stdout);
+      if(rec_prec_flow_field_dt > 0) {
+       if(rec_prec_flow_field_ttime_out >= rec_prec_flow_field_dt) {
+          // pull back data and write fields
           cuda_dom_pull();
-          out_restart_turb();
-          printf("done.               \n");
+          cgns_turb_flow_field(rec_prec_flow_field_dt);
+          printf("  Writing precursor flow field file t = %e...done.\n",
+            ttime);
           fflush(stdout);
-          rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
+          rec_prec_flow_field_ttime_out = rec_prec_flow_field_ttime_out
+            - rec_prec_flow_field_dt;
+          rec_prec_flow_field_stepnum_out++;
         }
       }
+      // write a restart file and exit when the time is appropriate
+      int rest_com;
+      prec_comm_restart_write(np, &rest_com, rank, status);
+      if(rest_com) {
+        printf("  Writing precursor restart file (t = %e)...", ttime);
+        fflush(stdout);
+        cuda_dom_pull();
+        out_restart_turb();
+        printf("done.               \n");
+        fflush(stdout);
+        rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
+        startwalltime = time(NULL);
+        if(rec_restart_stop)
+          break; // exit!
+      }
+    }
+
+    if(rec_restart_dt > 0 && ttime >= duration && !restart_stop) {
+      printf("  Writing final precursor restart file (t = %e)...", ttime);
+      fflush(stdout);
+      cuda_dom_pull();
+      out_restart_turb();
+      printf("done.               \n");
+      fflush(stdout);
+      rec_restart_ttime_out = rec_restart_ttime_out - rec_restart_dt;
+      startwalltime = time(NULL);
     }
 
     // clean up devices

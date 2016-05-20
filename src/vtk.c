@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -22,11 +22,10 @@
 
 #include "bluebottle.h"
 #include "particle.h"
-#include "Eulerian.h"
 
 void init_VTK(void)
 {
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
 
   // open PVD file for writing
   sprintf(fname, "%sout.pvd", OUTPUT_DIR);
@@ -48,17 +47,21 @@ void init_VTK(void)
 
 void out_VTK(void)
 {
-  char fname_pvd[FILE_NAME_SIZE]; // pvd filename
-  char fname_pvtr[FILE_NAME_SIZE]; // pvtr filename
-  char fname_vtp[FILE_NAME_SIZE]; // vtp filename
-  char fnamenodes_vtp[FILE_NAME_SIZE]; // vtp filename
+  char fname_pvd[FILE_NAME_SIZE] = ""; // pvd filename
+  char fname_pvtr[FILE_NAME_SIZE] = ""; // pvtr filename
+  char fname_vtp[FILE_NAME_SIZE] = ""; // vtp filename
+  char fnamenodes_vtp[FILE_NAME_SIZE] = ""; // vtp filename
 
   sprintf(fname_pvd, "%sout.pvd", OUTPUT_DIR);
   sprintf(fname_pvtr, "out_%d.pvtr", rec_paraview_stepnum_out);
   sprintf(fname_vtp, "out_%d.vtp", rec_paraview_stepnum_out);
   sprintf(fnamenodes_vtp, "out_nodes_%d.vtp", rec_paraview_stepnum_out);
 
-  FILE *pvdfile= fopen(fname_pvd, "r+");
+  FILE *pvdfile = fopen(fname_pvd, "r+");
+  if(pvdfile == NULL) {
+    init_VTK();
+    pvdfile = fopen(fname_pvd, "r+");
+  }
   // moves back 2 lines from the end of the file (above the footer)
   fseek(pvdfile, -24, SEEK_END);
 
@@ -80,17 +83,17 @@ void out_VTK(void)
 void dom_out_VTK(void)
 {
   int i, j, k, l; // iterators
-  char fname[FILE_NAME_SIZE]; // output filename
-  char fname_dom[FILE_NAME_SIZE]; // subdomain filename
+  char fname[FILE_NAME_SIZE] = ""; // output filename
+  char fname_dom[FILE_NAME_SIZE] = ""; // subdomain filename
   int C;  // cell center index
   int Cx;  // cell center index for interpolation
   int Cy;  // cell center index for interpolation
   int Cz;  // cell center index for interpolation
 
   // number of cells in a subdomain (length, start, end)
-  int ncx_l, ncx_s, ncx_e;  
-  int ncy_l, ncy_s, ncy_e;  
-  int ncz_l, ncz_s, ncz_e;  
+  int ncx_l, ncx_s, ncx_e;
+  int ncy_l, ncy_s, ncy_e;
+  int ncz_l, ncz_s, ncz_e;
 
   sprintf(fname, "%sout_%d.pvtr", OUTPUT_DIR, rec_paraview_stepnum_out);
   FILE *outfile = fopen(fname, "w");
@@ -105,13 +108,9 @@ void dom_out_VTK(void)
   fprintf(outfile, "\"0 %d 0 %d 0 %d\" GhostLevel=\"0\">\n",
     Dom.xn, Dom.yn, Dom.zn);
   //fprintf(outfile, "<PCellData Scalars=\"p divU phase phase_shell\" Vectors=\"vel flag\">\n");
-//##############################################################################
-  fprintf(outfile, "<PCellData Scalars=\"p numden concen bubmas phase\" Vectors=\"vel\">\n");
+  fprintf(outfile, "<PCellData Scalars=\"p phase\" Vectors=\"vel\">\n");
   fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"p\"/>\n");
-  fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"numden\"/>\n");
-  fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"concen\"/>\n");
-  fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"bubmas\"/>\n");
-//##############################################################################
+  //fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"divU\"/>\n");
   fprintf(outfile, "<PDataArray type=\"Int32\" Name=\"phase\"/>\n");
   //fprintf(outfile, "<PDataArray type=\"Int32\" Name=\"phase_shell\"/>\n");
   fprintf(outfile, "<PDataArray type=\"Float32\" Name=\"vel\"");
@@ -208,9 +207,7 @@ void dom_out_VTK(void)
     fprintf(outfile, "%d %d ", ncy_s, ncy_e);
     fprintf(outfile, "%d %d\">\n", ncz_s, ncz_e);
     //fprintf(outfile, "<CellData Scalars=\"p divU phase phase_shell\" Vectors=\"vel flag\">\n");
-//##############################################################################
-    fprintf(outfile, "<CellData Scalars=\"p numden concen bubmas phase\" Vectors=\"vel\">\n");
-//##############################################################################
+    fprintf(outfile, "<CellData Scalars=\"p phase\" Vectors=\"vel\">\n");
     fprintf(outfile, "<DataArray type=\"Float32\" Name=\"p\">\n");
     // write pressure for this subdomain
     for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
@@ -223,48 +220,6 @@ void dom_out_VTK(void)
     }
     fprintf(outfile, "\n");
     fprintf(outfile, "</DataArray>\n");
-//##############################################################################
-    fprintf(outfile, "<DataArray type=\"Float32\" Name=\"numden\">\n");
-    // write numden for this subdomain
-    for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
-      for(j = ncy_s + Dom.Gcc.js; j < ncy_e + Dom.Gcc.js; j++) {
-        for(i = ncx_s + Dom.Gcc.is; i < ncx_e + Dom.Gcc.is; i++) {
-          C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-          fprintf(outfile, "%e ", numden[C]);
-        }
-      }
-    }
-    fprintf(outfile, "\n");
-    fprintf(outfile, "</DataArray>\n");
-//##############################################################################
-//##############################################################################
-    fprintf(outfile, "<DataArray type=\"Float32\" Name=\"concen\">\n");
-    // write concen for this subdomain
-    for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
-      for(j = ncy_s + Dom.Gcc.js; j < ncy_e + Dom.Gcc.js; j++) {
-        for(i = ncx_s + Dom.Gcc.is; i < ncx_e + Dom.Gcc.is; i++) {
-          C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-          fprintf(outfile, "%e ", concen[C]);
-        }
-      }
-    }
-    fprintf(outfile, "\n");
-    fprintf(outfile, "</DataArray>\n");
-//##############################################################################
-//##############################################################################
-    fprintf(outfile, "<DataArray type=\"Float32\" Name=\"bubmas\">\n");
-    // write bubmas for this subdomain
-    for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
-      for(j = ncy_s + Dom.Gcc.js; j < ncy_e + Dom.Gcc.js; j++) {
-        for(i = ncx_s + Dom.Gcc.is; i < ncx_e + Dom.Gcc.is; i++) {
-          C = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
-          fprintf(outfile, "%e ", bubmas[C]);
-        }
-      }
-    }
-    fprintf(outfile, "\n");
-    fprintf(outfile, "</DataArray>\n");
-//##############################################################################
     /*fprintf(outfile, "<DataArray type=\"Float32\" Name=\"divU\">\n");
     // write pressure for this subdomain
     for(k = ncz_s + Dom.Gcc.ks; k < ncz_e + Dom.Gcc.ks; k++) {
@@ -368,7 +323,7 @@ void dom_out_VTK(void)
 
 void init_VTK_turb(void)
 {
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
 
   // open PVD file for writing
   sprintf(fname, "%sout_turb.pvd", OUTPUT_DIR);
@@ -390,13 +345,17 @@ void init_VTK_turb(void)
 
 void out_VTK_turb(void)
 {
-  char fname_pvd[FILE_NAME_SIZE]; // pvd filename
-  char fname_pvtr[FILE_NAME_SIZE]; // pvtr filename
+  char fname_pvd[FILE_NAME_SIZE] = ""; // pvd filename
+  char fname_pvtr[FILE_NAME_SIZE] = ""; // pvtr filename
 
   sprintf(fname_pvd, "%sout_turb.pvd", OUTPUT_DIR);
-  sprintf(fname_pvtr, "out_turb_%d.pvtr", rec_precursor_stepnum_out);
+  sprintf(fname_pvtr, "out_turb_%d.pvtr", rec_prec_stepnum_out);
 
   FILE *pvdfile= fopen(fname_pvd, "r+");
+  if (pvdfile == NULL) {
+    init_VTK_turb();
+    pvdfile= fopen(fname_pvd, "r+");
+  }
   // moves back 2 lines from the end of the file (above the footer)
   fseek(pvdfile, -24, SEEK_END);
 
@@ -412,8 +371,8 @@ void out_VTK_turb(void)
 void dom_out_VTK_turb(void)
 {
   int i, j, k, l; // iterators
-  char fname[FILE_NAME_SIZE]; // output filename
-  char fname_dom[FILE_NAME_SIZE]; // subdomain filename
+  char fname[FILE_NAME_SIZE] = ""; // output filename
+  char fname_dom[FILE_NAME_SIZE] = ""; // subdomain filename
   int C;  // cell center index
   int Cx;  // cell center index for interpolation
   int Cy;  // cell center index for interpolation
@@ -424,7 +383,7 @@ void dom_out_VTK_turb(void)
   int ncy_l, ncy_s, ncy_e;  
   int ncz_l, ncz_s, ncz_e;  
 
-  sprintf(fname, "%sout_turb_%d.pvtr", OUTPUT_DIR, rec_precursor_stepnum_out);
+  sprintf(fname, "%sout_turb_%d.pvtr", OUTPUT_DIR, rec_prec_stepnum_out);
   FILE *outfile = fopen(fname, "w");
   if(outfile == NULL) {
     fprintf(stderr, "Could not open file %s\n", fname);
@@ -466,7 +425,7 @@ void dom_out_VTK_turb(void)
     fprintf(outfile, "%d %d ", ncx_s, ncx_e);
     fprintf(outfile, "%d %d ", ncy_s, ncy_e);
     fprintf(outfile, "%d %d\" ", ncz_s, ncz_e);
-    sprintf(fname_dom, "out_turb_%d_%d.vtr", rec_precursor_stepnum_out, l/6);
+    sprintf(fname_dom, "out_turb_%d_%d.vtr", rec_prec_stepnum_out, l/6);
     fprintf(outfile, "Source=\"%s\"/>\n", fname_dom);
   }
   fprintf(outfile, "</PRectilinearGrid>\n");
@@ -520,7 +479,7 @@ void dom_out_VTK_turb(void)
     ncz_e = ncz_s + ncz_l;
 
     // open file for writing
-    sprintf(fname, "%s/out_turb_%d_%d.vtr", OUTPUT_DIR, rec_precursor_stepnum_out, l/6);
+    sprintf(fname, "%s/out_turb_%d_%d.vtr", OUTPUT_DIR, rec_prec_stepnum_out, l/6);
     FILE *outfile = fopen(fname, "w");
     if(outfile == NULL) {
       fprintf(stderr, "Could not open file %s\n", fname);
@@ -652,7 +611,7 @@ void dom_out_VTK_turb(void)
 
 void init_VTK_ghost(void)
 {
-  char fname[FILE_NAME_SIZE];
+  char fname[FILE_NAME_SIZE] = "";
 
   // open PVD file for writing
   sprintf(fname, "%sout_ghost.pvd", OUTPUT_DIR);
@@ -674,15 +633,19 @@ void init_VTK_ghost(void)
 
 void out_VTK_ghost(void)
 {
-  char fname_pvd[FILE_NAME_SIZE]; // pvd filename
-  char fname_pvtr[FILE_NAME_SIZE]; // pvtr filename
-  char fname_vtp[FILE_NAME_SIZE]; // vtp filename
+  char fname_pvd[FILE_NAME_SIZE] = ""; // pvd filename
+  char fname_pvtr[FILE_NAME_SIZE] = ""; // pvtr filename
+  char fname_vtp[FILE_NAME_SIZE] = ""; // vtp filename
 
   sprintf(fname_pvd, "%sout_ghost.pvd", OUTPUT_DIR);
   sprintf(fname_pvtr, "out_ghost_%d.pvtr", rec_paraview_stepnum_out);
   sprintf(fname_vtp, "out_%d.vtp", rec_paraview_stepnum_out);
 
   FILE *pvdfile= fopen(fname_pvd, "r+");
+  if (pvdfile == NULL) {
+    init_VTK_ghost();
+    pvdfile= fopen(fname_pvd, "r+");
+  }
   // moves back 2 lines from the end of the file (above the footer)
   fseek(pvdfile, -24, SEEK_END);
 
@@ -701,8 +664,8 @@ void out_VTK_ghost(void)
 void dom_out_VTK_ghost(void)
 {
   int i, j, k, l; // iterators
-  char fname[FILE_NAME_SIZE]; // output filename
-  char fname_dom[FILE_NAME_SIZE]; // subdomain filename
+  char fname[FILE_NAME_SIZE] = ""; // output filename
+  char fname_dom[FILE_NAME_SIZE] = ""; // subdomain filename
   int C;  // cell center index
   int Cx;  // cell center index for interpolation
   int Cy;  // cell center index for interpolation
@@ -799,19 +762,6 @@ void dom_out_VTK_ghost(void)
         vv_star[C] = 0.5 * (v_star[Cy] + v_star[Cy+Dom.Gfy.s1b]);
         ww_star[C] = 0.5 * (w_star[Cz] + w_star[Cz+Dom.Gfz.s2b]);
         // interpolate flags
-        flag_uu[C] = 0.5*(flag_u[Cx] + flag_u[Cx+1]);
-        flag_vv[C] = 0.5*(flag_v[Cy] + flag_v[Cy+Dom.Gfy.s1b]);
-        flag_ww[C] = 0.5*(flag_w[Cz] + flag_w[Cz+Dom.Gfz.s2b]);
-      }
-    }
-  }
-  for(k = Dom.Gcc.ks; k < Dom.Gcc.ke; k++) {
-    for(j = Dom.Gcc.js; j < Dom.Gcc.je; j++) {
-      for(i = Dom.Gcc.is; i < Dom.Gcc.ie; i++) {
-        C = i + j*Dom.Gcc.s1b + k*Dom.Gcc.s2b;
-        Cx = i + j*Dom.Gfx.s1b + k*Dom.Gfx.s2b;
-        Cy = i + j*Dom.Gfy.s1b + k*Dom.Gfy.s2b;
-        Cz = i + j*Dom.Gfz.s1b + k*Dom.Gfz.s2b;
         flag_uu[C] = 0.5*(flag_u[Cx] + flag_u[Cx+1]);
         flag_vv[C] = 0.5*(flag_v[Cy] + flag_v[Cy+Dom.Gfy.s1b]);
         flag_ww[C] = 0.5*(flag_w[Cz] + flag_w[Cz+Dom.Gfz.s2b]);
@@ -985,7 +935,7 @@ void dom_out_VTK_ghost(void)
 void part_out_VTK(void)
 {
   int i; // iterator
-  char fname[FILE_NAME_SIZE]; // output filename
+  char fname[FILE_NAME_SIZE] = ""; // output filename
   int nparts_plot = 0;    // the number of particles to plot; may be greater
                           // may be greater than nparts if particles straddle
 
@@ -2441,7 +2391,7 @@ void part_out_VTK(void)
 void quadnodes_out_VTK(void)
 {
   int i, j; // iterator
-  char fname[FILE_NAME_SIZE]; // output filename
+  char fname[FILE_NAME_SIZE] = ""; // output filename
   int nparts_plot = 0;    // the number of particles to plot; may be greater
                           // may be greater than nparts if particles straddle
 

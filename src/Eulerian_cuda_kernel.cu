@@ -1,4 +1,4 @@
-#include "cuda_Eulerian.h"
+#include "Eulerian_cuda.h"
 #include <math.h>
 #include "bluebottle.h"
 
@@ -25,7 +25,7 @@ __global__ void kernel_numberdensity_particle_velz(dom_struct *dom,
 			//	velzp[C] = 0.;
 			//}
 			
-			//if(ti==32 && tj==32 && k<5) printf("compute vel: k==%d, velz==%f, ter_temp==%f, sign==%f,terC0==%f\n",k,velz[C],ter_temp,copysign(1.0,velzp[C]),ter[C0]);
+			//if(ti==40 && tj==40) printf("compute vel: k==%d, velz==%f, ter_temp==%f, sign==%f,terC0==%f\n",k,velz[C],ter_temp,copysign(1.0,velzp[C]),ter[C0]);
 		}
 		
 		// below for bubbles being generated on boundary
@@ -81,6 +81,7 @@ __global__ void kernel_march_numberdensity(real dt,
 			real ny = dt / dom->dy * (uy[fy1] * n_y1 - uy[fy0] * n_y0);
 			real nz = dt / dom->dz * (uz[fz1] * n_z1 - uz[fz0] * n_z0);
 			numden1[C] = numden[C] - nx - ny - nz + dt * numdot[C];
+			//if(i == 5 && tj == 5 && tk ==5) printf("******%f*****\n", numdot[C]);
 		}
 	}
 }
@@ -288,8 +289,8 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
 	}
 }
 
-// pressure(cell-centered value); bottom; dirichlet
-__global__ void BC_p_B_D(real *p, dom_struct *dom, real bc)
+// pressure(cell-centered value); ghost cell; bottom; dirichlet
+__global__ void BC_p_B_ghost_D(real *p, dom_struct *dom)
 {
 	int ti = blockDim.x*blockIdx.x + threadIdx.x;
 	int tj = blockDim.y*blockIdx.y + threadIdx.y;
@@ -298,11 +299,11 @@ __global__ void BC_p_B_D(real *p, dom_struct *dom, real bc)
 	int s2b = dom->Gcc._s2b;
 	
 	if((ti < dom->Gcc._inb) && (tj < dom->Gcc._jnb))
-		p[ti + tj*s1b + dom->Gcc._ksb*s2b] = 2 * bc - p[ti + tj*s1b + dom->Gcc._ks*s2b];
+		p[ti + tj*s1b + dom->Gcc._ksb*s2b] = 0.;
 }
 
-// pressure(cell-centered value); top; dirichlet
-__global__ void BC_p_T_D(real *p, dom_struct *dom, real bc)
+// pressure(cell-centered value); ghost; top; dirichlet
+__global__ void BC_p_T_ghost_D(real *p, dom_struct *dom)
 {
 	int ti = blockDim.x*blockIdx.x + threadIdx.x;
 	int tj = blockDim.y*blockIdx.y + threadIdx.y;
@@ -311,7 +312,7 @@ __global__ void BC_p_T_D(real *p, dom_struct *dom, real bc)
 	int s2b = dom->Gcc._s2b;
 	
 	if((ti < dom->Gcc._inb) && (tj < dom->Gcc._jnb))
-		p[ti + tj*s1b + (dom->Gcc._keb-1)*s2b] = 2 * bc - p[ti + tj*s1b + (dom->Gcc._ke-1)*s2b];
+		p[ti + tj*s1b + (dom->Gcc._keb-1)*s2b] = 0.;
 }
 
 __global__ void kernel_compute_bubble_diameter(dom_struct *dom,
@@ -378,21 +379,26 @@ __global__ void kernel_compute_bubble_diameterfz(dom_struct *dom,
 }
 
 __global__ void kernel_forcing_add_z_field_bubble(real scale,
-                                                  real *ndfz,
-                                                  real *diafz,
+                                                  real *nd,
+                                                  real *dia,
                                                   real *fz,
                                                   dom_struct *dom,
-                                                  real *bdenf,
+                                                  real *bden,
                                                   real rho_fluid)
 {
 	int ti = blockIdx.x * blockDim.x + threadIdx.x;
 	int tj = blockIdx.y * blockDim.y + threadIdx.y;
 	
 	if(ti < dom->Gfz._inb && tj < dom->Gfz._jnb) {
-		for(int k = dom->Gfz._ksb; k < dom->Gfz._keb; k++) {
-			int C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
+		for(int k = dom->Gfz._ksb + 1; k < dom->Gfz._keb - 1; k++) {
 			
-			fz[C] += scale * ndfz[C] * diafz[C] * diafz[C] * diafz[C] * (rho_fluid - bdenf[C]);
+			int Cz = ti + tj*dom->Gfz._s1b + k      *dom->Gfz._s2b;
+			int C1 = ti + tj*dom->Gcc._s1b + k      *dom->Gcc._s2b;
+			int C0 = ti + tj*dom->Gcc._s1b + (k - 1)*dom->Gcc._s2b;
+			
+			real temp_1 = scale * nd[C1] * dia[C1] * dia[C1] * dia[C1] * (rho_fluid - bden[C1]);
+			real temp_0 = scale * nd[C0] * dia[C0] * dia[C0] * dia[C0] * (rho_fluid - bden[C0]);
+			fz[Cz] += 0.5 * (temp_0 + temp_1);
 			
 			//if(ti==32 && tj==32 && k<10)
 			//printf("forcing: k==%d, fz==%f, nd==%f, diafz==%f\n", k, fz[C], ndfz[C], diafz[C]);

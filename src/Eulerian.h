@@ -30,7 +30,12 @@ void out_restart_Eulerian(void);
 extern int turb_switch;
 #define ON 1
 #define OFF -1
-int domain_init_Eulerian(void);
+extern int quiescent_fluid;
+
+void turbulence_init_Eulerian(void);
+real cuda_Eulerian_find_dt(void);
+void cuda_Eulerian_compute_forcing(real *pid_int, real *pid_back, real Kp, real Ki, real Kd);
+void Eulerian_out_restart(void);
 //======================================================================
 // number density equation
 
@@ -38,6 +43,7 @@ int domain_init_Eulerian(void);
 #define RANDOM 271828
 #define GAUSSIAN 0
 #define HYPERBOLICTAN 1
+#define HYPERBOLICTAN_RANDOM 2
 
 extern real bubble_radius;
 extern int bubble_init_cond;
@@ -101,11 +107,22 @@ extern real **_BGndot;
 extern real *BGmdot;
 extern real **_BGmdot;
 extern real TerminalVelocityLimit;
+typedef struct bubble_struct {
+	real x;
+	real y;
+	real z;
+} bubble_struct;
+extern bubble_struct *bub_gen_pos;
+extern real *Ix;
+extern real *Iy;
+extern real *Iz;
 
+void cuda_compute_HYPERBOLICTANRANDOM(void);
+void cuda_botbubbvel_BC(void);
 void cuda_numberdensity_BC(void);
-void cuda_num_mas_BC_compute(void);
 void cuda_numberdensity_march(void);
 void cuda_numberdensity_compute_totalnumden(void);
+void compute_total_number(void);
 //======================================================================
 // concentration equation
 

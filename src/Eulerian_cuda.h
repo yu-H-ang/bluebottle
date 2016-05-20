@@ -60,13 +60,11 @@ __global__ void kernel_compute_mdot(dom_struct *dom,
                                     real ccdiff,
                                     real nu);
 
-__global__ void BC_p_B_D(real *p,
-                         dom_struct *dom,
-                         real bc);
+__global__ void BC_p_B_ghost_D(real *p,
+                         dom_struct *dom);
 
-__global__ void BC_p_T_D(real *p,
-                         dom_struct *dom,
-                         real bc);
+__global__ void BC_p_T_ghost_D(real *p,
+                         dom_struct *dom);
 
 __global__ void kernel_compute_bubble_diameter(dom_struct *dom,
                                                real *mas,
@@ -79,11 +77,11 @@ __global__ void kernel_compute_bubble_diameter(dom_struct *dom,
                                                real gravacc);
 
 __global__ void kernel_forcing_add_z_field_bubble(real scale,
-                                                  real *ndfz,
-                                                  real *diafz,
+                                                  real *nd,
+                                                  real *dia,
                                                   real *fz,
                                                   dom_struct *dom,
-                                                  real *bdenf,
+                                                  real *bden,
                                                   real rho_fluid);
 
 

@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -59,12 +59,38 @@ void cgns_grid(void);
  ******
  */
 
+/****f* recorder/cgns_turb_grid()
+ * NAME
+ *  cgns_turb_grid()
+ * TYPE
+ */
+void cgns_turb_grid(void);
+/*
+ * FUNCTION
+ *  Write the CGNS grid output file.
+ ******
+ */
+
 /****f* recorder/cgns_flow_field()
  * NAME
  *  cgns_flow_field()
  * TYPE
  */
 void cgns_flow_field(real dtout);
+/*
+ * FUNCTION
+ *  Write the CGNS flow_field output file.
+ * ARGUMENTS
+ *  * dtout -- the output timestep size
+ ******
+ */
+
+/****f* recorder/cgns_turb_flow_field()
+ * NAME
+ *  cgns_turb_flow_field()
+ * TYPE
+ */
+void cgns_turb_flow_field(real dtout);
 /*
  * FUNCTION
  *  Write the CGNS flow_field output file.
@@ -116,21 +142,6 @@ void recorder_lamb_init(char *name);
  ******
  */
 
-/****f* recorder/recorder_cfl_init()
- * NAME
- *  recorder_cfl_init()
- * TYPE
- */
-void recorder_cfl_init(char *name);
-/*
- * FUNCTION
- *  Create the file name for writing and summarize fields to be written for the
- *  CFL condition
- * ARGUMENTS
- *  * name -- the name of the file to be written
- ******
- */
-
 /****f* recorder/recorder_bicgstab()
  * NAME
  *  recorder_bicgstab()
@@ -159,21 +170,6 @@ void recorder_lamb(char *name, int iter);
  * ARGUMENTS
  *  * name -- the name of the file to which to write
  *  * iter -- the number of the iteration
- ******
- */
-
-/****f* recorder/recorder_cfl()
- * NAME
- *  recorder_cfl()
- * TYPE
- */
-void recorder_cfl(char *name, real cfl);
-/*
- * FUNCTION 
- *  Write out BICGSTAB solver information to file name.
- * ARGUMENTS
- *  * name -- the name of the file to which to write
- *  * cfl -- the cfl number
  ******
  */
 

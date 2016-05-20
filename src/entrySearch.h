@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -79,6 +79,23 @@ real find_min(int size, real *d_iarr);
  * USAGE
  */
 real find_max(int size, real *d_iarr);
+/*
+ * FUNCTION
+ *  Return the maximum value of array d_iarr.  Note that d_iarr will be
+ *  destroyed by the reduction algorithm.
+ * ARGUMENTS
+ *  * size -- the size of the array
+ *  * d_iarr -- the array to search (must be allocated on the device); it will
+ *    be destroyed by the reduction algorithm
+ ******
+ */
+
+/****f* entrySearch/find_max_int()
+ * NAME 
+ *  find_max_int()
+ * USAGE
+ */
+int find_max_int(int size, int *d_iarr);
 /*
  * FUNCTION
  *  Return the maximum value of array d_iarr.  Note that d_iarr will be
@@ -175,6 +192,23 @@ __global__ void entrySearch_max_kernel(real *iarr, real *maxarr,
  ******
  */
 
+/****f* entrySearch_kernel/entrySearch_max_int_kernel<<<>>>()
+ * NAME
+ *  entrySearch_max_int_kernel<<<>>>()
+ * USAGE
+ */
+__global__ void entrySearch_max_int_kernel(int *iarr, int *maxarr,
+  int size);
+/*
+ * FUNCTION
+ *  Kernel function called by find_max().
+ * ARGUMENTS
+ *  * iarr -- the input array
+ *  * maxarr -- the ouput array
+ *  * size -- the size of the input array
+ ******
+ */
+
 /****f* entrySearch_kernel/entrySearch_max_mag_kernel<<<>>>()
  * NAME
  *  entrySearch_max_mag_kernel<<<>>>()
@@ -208,5 +242,5 @@ __global__ void entrySearch_avg_entries_kernel(real *iarr, real *maxarr,
  *  * size -- the size of the input array
  ******
  */
-void getNumBlocksAndThreads(int n, int &blocks, int &threads);
+
 #endif

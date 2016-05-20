@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ __global__ void reset_phase_shell(int *phase_shell, dom_struct *dom)
   }
 }
 
-__global__ void reset_flag_u(int *flag_u, dom_struct *dom, BC bc)
+__global__ void reset_flag_u(int *flag_u, dom_struct *dom)
 {
   int i;    // iterator
   int tj = blockDim.x*blockIdx.x + threadIdx.x;
@@ -60,19 +60,9 @@ __global__ void reset_flag_u(int *flag_u, dom_struct *dom, BC bc)
       flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 1;
     }
   }
-
-  __syncthreads();
-
-  // flag external boundaries
-  if((tj < dom->Gfx._jnb) && (tk < dom->Gfx._knb)) {
-    if(bc.uW != PERIODIC)
-      flag_u[dom->Gfx._is + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-    if(bc.uE != PERIODIC)
-      flag_u[dom->Gfx._ie-1 + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-  }
 }
 
-__global__ void reset_flag_v(int *flag_v, dom_struct *dom, BC bc)
+__global__ void reset_flag_v(int *flag_v, dom_struct *dom)
 {
   int j;    // iterator
   int tk = blockDim.x*blockIdx.x + threadIdx.x;
@@ -84,19 +74,9 @@ __global__ void reset_flag_v(int *flag_v, dom_struct *dom, BC bc)
       flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 1;
     }
   }
-
-  __syncthreads();
-
-  // flag external boundaries
-  if((tk < dom->Gfy._knb) && (ti < dom->Gfy._inb)) {
-    if(bc.vS != PERIODIC)
-      flag_v[ti + dom->Gfy._js*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-    if(bc.vN != PERIODIC)
-      flag_v[ti + (dom->Gfy._je-1)*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-  }
 }
 
-__global__ void reset_flag_w(int *flag_w, dom_struct *dom, BC bc)
+__global__ void reset_flag_w(int *flag_w, dom_struct *dom)
 {
   int k;    // iterator
   int ti = blockDim.x*blockIdx.x + threadIdx.x;
@@ -108,15 +88,33 @@ __global__ void reset_flag_w(int *flag_w, dom_struct *dom, BC bc)
       flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 1;
     }
   }
+}
 
-  __syncthreads();
+__global__ void build_phase(int p, part_struct *parts, int *phase,
+  dom_struct *dom, real X, real Y, real Z,
+  int is, int ie, int js, int je, int ks, int ke)
+{
+  real xx, yy, zz;  // distance from cell center to particle center along
+                    // Cartesian basis
+  real d;           // distance form cell center to particle center
+  int C;            // current cell
+  int cutoff;       // cage cutoff constant
 
-  // flag external boundaries
-  if((ti < dom->Gfz._inb) && (tj < dom->Gfz._jnb)) {
-    if(bc.wB != PERIODIC)
-      flag_w[ti + tj*dom->Gfz._s1b + dom->Gfz._ks*dom->Gfz._s2b] = 0;
-    if(bc.wT != PERIODIC)
-      flag_w[ti + tj*dom->Gfz._s1b + (dom->Gfz._ke-1)*dom->Gfz._s2b] = 0;
+  // update phase (use center of cell containing particle center)
+  int ti = blockDim.x*blockIdx.x + threadIdx.x + is;
+  int tj = blockDim.y*blockIdx.y + threadIdx.y + js;
+  int tk = blockDim.z*blockIdx.z + threadIdx.z + ks;
+  if((ti < ie) && (tj < je) && (tk < ke)) {
+    xx = (ti-0.5)*dom->dx - (X-dom->xs);
+    yy = (tj-0.5)*dom->dy - (Y-dom->ys);
+    zz = (tk-0.5)*dom->dz - (Z-dom->zs);
+    d = sqrt(xx * xx + yy * yy + zz * zz);
+
+    C = ti + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+
+    cutoff = (floor(d / (parts[p].r))) < 1;
+
+    phase[C] = cutoff*p + (1 - cutoff)*phase[C];
   }
 }
 
@@ -136,7 +134,7 @@ __global__ void build_cage(int p, part_struct *parts, int *phase,
 
   if((tj < je) && (tk < ke)) {
     X = parts[p].x;
-    if(parts[p].x < (dom->xs + parts[p].r)) X = parts[p].x + dom->xl;
+    if(parts[p].x < dom->xs) X = parts[p].x + dom->xl;
     for(int i = parts[p].cage.is; i < parts[p].cage.ibs; i++) {
       xx = (i-0.5)*dom->dx - (X-dom->xs);
       yy = (tj-0.5)*dom->dy - (Y-dom->ys);
@@ -158,7 +156,7 @@ __global__ void build_cage(int p, part_struct *parts, int *phase,
 */
     }
     X = parts[p].x;
-    if(parts[p].x > (dom->xe - parts[p].r)) X = parts[p].x - dom->xl;
+    if(parts[p].x > dom->xe) X = parts[p].x - dom->xl;
     for(int i = parts[p].cage.ibe; i < parts[p].cage.ie; i++) {
       xx = (i-0.5)*dom->dx - (X-dom->xs);
       yy = (tj-0.5)*dom->dy - (Y-dom->ys);
@@ -183,263 +181,116 @@ __global__ void build_cage(int p, part_struct *parts, int *phase,
   }
 }
 
-__global__ void cage_phases_periodic_W(int *phase, int *phase_shell,
-  dom_struct *dom)
+__global__ void cage_phases_periodic_x(int *phase_type, dom_struct *dom)
 {
   int tj = blockDim.x*blockIdx.x + threadIdx.x;
   int tk = blockDim.y*blockIdx.y + threadIdx.y;
 
   if(tj < dom->Gcc.jnb && tk < dom->Gcc.knb) {
-    phase[dom->Gcc.isb + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase[(dom->Gcc.ie-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-    phase_shell[dom->Gcc.isb + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase_shell[(dom->Gcc.ie-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
+    phase_type[dom->Gcc.isb + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
+      = phase_type[(dom->Gcc.ie-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
+    phase_type[(dom->Gcc.ieb-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
+      = phase_type[dom->Gcc.is + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
   }
 }
 
-__global__ void cage_phases_periodic_E(int *phase, int *phase_shell,
-  dom_struct *dom)
-{
-  int tj = blockDim.x*blockIdx.x + threadIdx.x;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tj < dom->Gcc.jnb && tk < dom->Gcc.knb) {
-    phase[(dom->Gcc.ieb-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase[dom->Gcc.is + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-    phase_shell[(dom->Gcc.ieb-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase_shell[dom->Gcc.is + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-  }
-}
-
-__global__ void cage_phases_periodic_S(int *phase, int *phase_shell,
-  dom_struct *dom)
+__global__ void cage_phases_periodic_y(int *phase_type, dom_struct *dom)
 {
   int tk = blockDim.x*blockIdx.x + threadIdx.x;
   int ti = blockDim.y*blockIdx.y + threadIdx.y;
 
   if(tk < dom->Gcc.knb && ti < dom->Gcc.inb) {
-    phase[ti + dom->Gcc.jsb*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase[ti + (dom->Gcc.je-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-    phase_shell[ti + dom->Gcc.jsb*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase_shell[ti + (dom->Gcc.je-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b];
+    phase_type[ti + dom->Gcc.jsb*dom->Gcc.s1b + tk*dom->Gcc.s2b]
+      = phase_type[ti + (dom->Gcc.je-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b];
+    phase_type[ti + (dom->Gcc.jeb-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]
+      = phase_type[ti + dom->Gcc.js*dom->Gcc.s1b + tk*dom->Gcc.s2b];
   }
 }
 
-__global__ void cage_phases_periodic_N(int *phase, int *phase_shell,
-  dom_struct *dom)
-{
-  int tk = blockDim.x*blockIdx.x + threadIdx.x;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tk < dom->Gcc.knb && ti < dom->Gcc.inb) {
-    phase[ti + (dom->Gcc.jeb-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase[ti + dom->Gcc.js*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-    phase_shell[ti + (dom->Gcc.jeb-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-      = phase_shell[ti + dom->Gcc.js*dom->Gcc.s1b + tk*dom->Gcc.s2b];
-  }
-}
-
-__global__ void cage_phases_periodic_B(int *phase, int *phase_shell,
-  dom_struct *dom)
+__global__ void cage_phases_periodic_z(int *phase_type, dom_struct *dom)
 {
   int ti = blockDim.x*blockIdx.x + threadIdx.x;
   int tj = blockDim.y*blockIdx.y + threadIdx.y;
 
   if(ti < dom->Gcc.inb && tj < dom->Gcc.jnb) {
-    phase[ti + tj*dom->Gcc.s1b + dom->Gcc.ksb*dom->Gcc.s2b]
-      = phase[ti + tj*dom->Gcc.s1b + (dom->Gcc.ke-1)*dom->Gcc.s2b];
-    phase_shell[ti + tj*dom->Gcc.s1b + dom->Gcc.ksb*dom->Gcc.s2b]
-      = phase_shell[ti + tj*dom->Gcc.s1b + (dom->Gcc.ke-1)*dom->Gcc.s2b];
+    phase_type[ti + tj*dom->Gcc.s1b + dom->Gcc.ksb*dom->Gcc.s2b]
+      = phase_type[ti + tj*dom->Gcc.s1b + (dom->Gcc.ke-1)*dom->Gcc.s2b];
+    phase_type[ti + tj*dom->Gcc.s1b + (dom->Gcc.keb-1)*dom->Gcc.s2b]
+      = phase_type[ti + tj*dom->Gcc.s1b + dom->Gcc.ks*dom->Gcc.s2b];
   }
 }
 
-__global__ void cage_phases_periodic_T(int *phase, int *phase_shell,
-  dom_struct *dom)
-{
-  int ti = blockDim.x*blockIdx.x + threadIdx.x;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(ti < dom->Gcc.inb && tj < dom->Gcc.jnb) {
-    phase[ti + tj*dom->Gcc.s1b + (dom->Gcc.keb-1)*dom->Gcc.s2b]
-      = phase[ti + tj*dom->Gcc.s1b + dom->Gcc.ks*dom->Gcc.s2b];
-    phase_shell[ti + tj*dom->Gcc.s1b + (dom->Gcc.keb-1)*dom->Gcc.s2b]
-      = phase_shell[ti + tj*dom->Gcc.s1b + dom->Gcc.ks*dom->Gcc.s2b];
-  }
-}
-
-__global__ void cage_flag_u_1(int p, int *flag_u, part_struct *parts,
-  dom_struct *dom, int *phase, int *phase_shell,
-  int js, int je, int ks, int ke)
+__global__ void phase_shell_x(part_struct *parts,
+  dom_struct *dom, int *phase, int *phase_shell)
 {
   int i;    // iterator
 
-  int tj = blockDim.x*blockIdx.x + threadIdx.x + js;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y + ks;
+  int W, E; // flag locations
 
-  if((tj < je) && (tk < ke)) {
-    for(i = parts[p].cage.is; i <= parts[p].cage.ibs; i++) {
-      if(phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = -1;
-          //flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-          phase_shell[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(i = parts[p].cage.ibs; i >= parts[p].cage.is; i--) {
-      if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = -1;
-          //flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-          phase_shell[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(i = parts[p].cage.ibe; i <= parts[p].cage.ie; i++) {
-      if(phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = -1;
-          //flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-          phase_shell[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(i = parts[p].cage.ie; i >= parts[p].cage.ibe; i--) {
-      if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = -1;
-          //flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
-          phase_shell[(i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
+  int tj = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
+
+  if((tj < dom->Gcc.je) && (tk < dom->Gcc.ke)) {
+    for(i = dom->Gcc.is; i <= dom->Gcc.ie; i++) {
+      W = (i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+      E = i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+      
+      // if phase changes from fluid to solid
+      phase_shell[E] = phase_shell[E]*(1 - (phase[W] < 0 && phase[E] > -1));
+      // if phase changes from solid to fluid
+      phase_shell[W] = phase_shell[W]*(1 - (phase[W] > -1 && phase[E] < 0));
+
     }
   }
 }
 
-__global__ void cage_flag_v_1(int p, int *flag_v, part_struct *parts,
-  dom_struct *dom, int *phase, int *phase_shell,
-  int is, int ie, int ks, int ke)
+__global__ void phase_shell_y(part_struct *parts,
+  dom_struct *dom, int *phase, int *phase_shell)
 {
   int j;    // iterator
 
-  int tk = blockDim.x*blockIdx.x + threadIdx.x + ks;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y + is;
+  int N, S; // flag locations
 
-  if((tk < ke) && (ti < ie)) {
-    for(j = parts[p].cage.js; j <= parts[p].cage.jbs; j++) {
-      if(phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = -1;
-          //flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-          phase_shell[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(j = parts[p].cage.jbs; j >= parts[p].cage.js; j--) {
-      if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = -1;
-          //flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-          phase_shell[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(j = parts[p].cage.jbe; j <= parts[p].cage.ie; j++) {
-      if(phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = -1;
-          //flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-          phase_shell[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(j = parts[p].cage.je; j >= parts[p].cage.jbe; j--) {
-      if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p
-        || phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b]
-          < phase[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b]) {
-          flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = -1;
-          //flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
-          phase_shell[ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
+  int tk = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int ti = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
 
+  if((tk < dom->Gcc.ke) && (ti < dom->Gcc.ie)) {
+    for(j = dom->Gcc.js; j <= dom->Gcc.je; j++) {
+      S = ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+      N = ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+
+      // if phase changes from fluid to solid
+      phase_shell[N] = phase_shell[N]*(1 - (phase[S] < 0 && phase[N] > -1));
+      // if phase changes from solid to fluid
+      phase_shell[S] = phase_shell[S]*(1 - (phase[S] > -1 && phase[N] < 0));
+
+    }
   }
 }
 
-__global__ void cage_flag_w_1(int p, int *flag_w, part_struct *parts,
-  dom_struct *dom, int *phase, int *phase_shell,
-  int is, int ie, int js, int je)
+__global__ void phase_shell_z(part_struct *parts,
+  dom_struct *dom, int *phase, int *phase_shell)
 {
   int k;    // iterator
 
-  int ti = blockDim.x*blockIdx.x + threadIdx.x + is;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y + js;
+  int B, T; // flag locations
 
-  if((ti < ie) && (tj < je)) {
-    for(k = parts[p].cage.ks; k <= parts[p].cage.kbs; k++) {
-      if(phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] == p
-        || phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p) {
-        if(phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b]
-          < phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b]) {
-          flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = -1;
-          //flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 0;
-          phase_shell[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(k = parts[p].cage.kbs; k >= parts[p].cage.ks; k--) {
-      if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p
-        || phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] == p) {
-        if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b]
-          < phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b]) {
-          flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = -1;
-          //flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 0;
-          phase_shell[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(k = parts[p].cage.kbe; k <= parts[p].cage.ke; k++) {
-      if(phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] == p
-        || phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p) {
-        if(phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b]
-          < phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b]) {
-          flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = -1;
-          //flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 0;
-          phase_shell[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] = 0;
-        }
-      }
-    }
-    for(k = parts[p].cage.ke; k >= parts[p].cage.kbe; k--) {
-      if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p
-        || phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] == p) {
-        if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b]
-          < phase[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b]) {
-          flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = -1;
-          //flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 0;
-          phase_shell[ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b] = 0;
-        }
-      }
+  int ti = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int tj = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
+
+  if((ti < dom->Gcc.ie) && (tj < dom->Gcc.je)) {
+    for(k = dom->Gcc.ks; k <= dom->Gcc.ke; k++) {
+      B = ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b;
+      T = ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b;
+      // if phase changes from fluid to solid
+      phase_shell[T] = phase_shell[T]*(1 - (phase[B] < 0 && phase[T] > -1));
+      // if phase changes from solid to fluid
+      phase_shell[B] = phase_shell[B]*(1 - (phase[B] > -1 && phase[T] < 0));
     }
   }
 }
 
-__global__ void cage_flag_u_periodic_W(int *flag_u, dom_struct *dom)
+__global__ void cage_flag_u_periodic_x(int *flag_u, dom_struct *dom)
 {
   int tj = blockDim.x*blockIdx.x + threadIdx.x;
   int tk = blockDim.y*blockIdx.y + threadIdx.y;
@@ -447,21 +298,12 @@ __global__ void cage_flag_u_periodic_W(int *flag_u, dom_struct *dom)
   if(tj < dom->Gfx.jnb && tk < dom->Gfx.knb) {
     flag_u[dom->Gfx.isb + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b]
       = flag_u[(dom->Gfx.ie-2) + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b];
-  }
-}
-
-__global__ void cage_flag_u_periodic_E(int *flag_u, dom_struct *dom)
-{
-  int tj = blockDim.x*blockIdx.x + threadIdx.x;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tj < dom->Gfx.jnb && tk < dom->Gfx.knb) {
     flag_u[(dom->Gfx.ieb-1) + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b]
       = flag_u[(dom->Gfx.is+1) + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b];
   }
 }
 
-__global__ void cage_flag_u_periodic_S(int *flag_u, dom_struct *dom)
+__global__ void cage_flag_u_periodic_y(int *flag_u, dom_struct *dom)
 {
   int tk = blockDim.x*blockIdx.x + threadIdx.x;
   int ti = blockDim.y*blockIdx.y + threadIdx.y;
@@ -469,21 +311,12 @@ __global__ void cage_flag_u_periodic_S(int *flag_u, dom_struct *dom)
   if(tk < dom->Gfx.knb && ti < dom->Gfx.inb) {
     flag_u[ti + dom->Gfx.jsb*dom->Gfx.s1b + tk*dom->Gfx.s2b]
       = flag_u[ti + (dom->Gfx.je-1)*dom->Gfx.s1b + tk*dom->Gfx.s2b];
-  }
-}
-
-__global__ void cage_flag_u_periodic_N(int *flag_u, dom_struct *dom)
-{
-  int tk = blockDim.x*blockIdx.x + threadIdx.x;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tk < dom->Gfx.knb && ti < dom->Gfx.inb) {
     flag_u[ti + (dom->Gfx.jeb-1)*dom->Gfx.s1b + tk*dom->Gfx.s2b]
       = flag_u[ti + dom->Gfx.js*dom->Gfx.s1b + tk*dom->Gfx.s2b];
   }
 }
 
-__global__ void cage_flag_u_periodic_B(int *flag_u, dom_struct *dom)
+__global__ void cage_flag_u_periodic_z(int *flag_u, dom_struct *dom)
 {
   int ti = blockDim.x*blockIdx.x + threadIdx.x;
   int tj = blockDim.y*blockIdx.y + threadIdx.y;
@@ -491,21 +324,12 @@ __global__ void cage_flag_u_periodic_B(int *flag_u, dom_struct *dom)
   if(ti < dom->Gfx.inb && tj < dom->Gfx.jnb) {
     flag_u[ti + tj*dom->Gfx.s1b + dom->Gfx.ksb*dom->Gfx.s2b]
       = flag_u[ti + tj*dom->Gfx.s1b + (dom->Gfx.ke-1)*dom->Gfx.s2b];
-  }
-}
-
-__global__ void cage_flag_u_periodic_T(int *flag_u, dom_struct *dom)
-{
-  int ti = blockDim.x*blockIdx.x + threadIdx.x;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(ti < dom->Gfx.inb && tj < dom->Gfx.jnb) {
     flag_u[ti + tj*dom->Gfx.s1b + (dom->Gfx.keb-1)*dom->Gfx.s2b]
       = flag_u[ti + tj*dom->Gfx.s1b + dom->Gfx.ks*dom->Gfx.s2b];
   }
 }
 
-__global__ void cage_flag_v_periodic_W(int *flag_v, dom_struct *dom)
+__global__ void cage_flag_v_periodic_x(int *flag_v, dom_struct *dom)
 {
   int tj = blockDim.x*blockIdx.x + threadIdx.x;
   int tk = blockDim.y*blockIdx.y + threadIdx.y;
@@ -513,21 +337,12 @@ __global__ void cage_flag_v_periodic_W(int *flag_v, dom_struct *dom)
   if(tj < dom->Gfy.jnb && tk < dom->Gfy.knb) {
     flag_v[dom->Gfy.isb + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b]
       = flag_v[(dom->Gfy.ie-1) + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b];
-  }
-}
-
-__global__ void cage_flag_v_periodic_E(int *flag_v, dom_struct *dom)
-{
-  int tj = blockDim.x*blockIdx.x + threadIdx.x;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tj < dom->Gfy.jnb && tk < dom->Gfy.knb) {
     flag_v[(dom->Gfy.ieb-1) + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b]
       = flag_v[dom->Gfy.is + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b];
   }
 }
 
-__global__ void cage_flag_v_periodic_S(int *flag_v, dom_struct *dom)
+__global__ void cage_flag_v_periodic_y(int *flag_v, dom_struct *dom)
 {
   int tk = blockDim.x*blockIdx.x + threadIdx.x;
   int ti = blockDim.y*blockIdx.y + threadIdx.y;
@@ -535,21 +350,12 @@ __global__ void cage_flag_v_periodic_S(int *flag_v, dom_struct *dom)
   if(tk < dom->Gfy.knb && ti < dom->Gfy.inb) {
     flag_v[ti + dom->Gfy.jsb*dom->Gfy.s1b + tk*dom->Gfy.s2b]
       = flag_v[ti + (dom->Gfy.je-2)*dom->Gfy.s1b + tk*dom->Gfy.s2b];
-  }
-}
-
-__global__ void cage_flag_v_periodic_N(int *flag_v, dom_struct *dom)
-{
-  int tk = blockDim.x*blockIdx.x + threadIdx.x;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tk < dom->Gfy.knb && ti < dom->Gfy.inb) {
     flag_v[ti + (dom->Gfy.jeb-1)*dom->Gfy.s1b + tk*dom->Gfy.s2b]
       = flag_v[ti + (dom->Gfy.js+1)*dom->Gfy.s1b + tk*dom->Gfy.s2b];
   }
 }
 
-__global__ void cage_flag_v_periodic_B(int *flag_v, dom_struct *dom)
+__global__ void cage_flag_v_periodic_z(int *flag_v, dom_struct *dom)
 {
   int ti = blockDim.x*blockIdx.x + threadIdx.x;
   int tj = blockDim.y*blockIdx.y + threadIdx.y;
@@ -557,21 +363,12 @@ __global__ void cage_flag_v_periodic_B(int *flag_v, dom_struct *dom)
   if(ti < dom->Gfy.inb && tj < dom->Gfy.jnb) {
     flag_v[ti + tj*dom->Gfy.s1b + dom->Gfy.ksb*dom->Gfy.s2b]
       = flag_v[ti + tj*dom->Gfy.s1b + (dom->Gfy.ke-1)*dom->Gfy.s2b];
-  }
-}
-
-__global__ void cage_flag_v_periodic_T(int *flag_v, dom_struct *dom)
-{
-  int ti = blockDim.x*blockIdx.x + threadIdx.x;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(ti < dom->Gfy.inb && tj < dom->Gfy.jnb) {
     flag_v[ti + tj*dom->Gfy.s1b + (dom->Gfy.keb-1)*dom->Gfy.s2b]
       = flag_v[ti + tj*dom->Gfy.s1b + dom->Gfy.ks*dom->Gfy.s2b];
   }
 }
 
-__global__ void cage_flag_w_periodic_W(int *flag_w, dom_struct *dom)
+__global__ void cage_flag_w_periodic_x(int *flag_w, dom_struct *dom)
 {
   int tj = blockDim.x*blockIdx.x + threadIdx.x;
   int tk = blockDim.y*blockIdx.y + threadIdx.y;
@@ -579,21 +376,12 @@ __global__ void cage_flag_w_periodic_W(int *flag_w, dom_struct *dom)
   if(tj < dom->Gfz.jnb && tk < dom->Gfz.knb) {
     flag_w[dom->Gfz.isb + tj*dom->Gfz.s1b + tk*dom->Gfz.s2b]
       = flag_w[(dom->Gfz.ie-1)+ tj*dom->Gfz.s1b + tk*dom->Gfz.s2b];
-  }
-}
-
-__global__ void cage_flag_w_periodic_E(int *flag_w, dom_struct *dom)
-{
-  int tj = blockDim.x*blockIdx.x + threadIdx.x;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tj < dom->Gfz.jnb && tk < dom->Gfz.knb) {
     flag_w[(dom->Gfz.ieb-1) + tj*dom->Gfz.s1b + tk*dom->Gfz.s2b]
       = flag_w[dom->Gfz.is + tj*dom->Gfz.s1b + tk*dom->Gfz.s2b];
   }
 }
 
-__global__ void cage_flag_w_periodic_S(int *flag_w, dom_struct *dom)
+__global__ void cage_flag_w_periodic_y(int *flag_w, dom_struct *dom)
 {
   int tk = blockDim.x*blockIdx.x + threadIdx.x;
   int ti = blockDim.y*blockIdx.y + threadIdx.y;
@@ -601,21 +389,12 @@ __global__ void cage_flag_w_periodic_S(int *flag_w, dom_struct *dom)
   if(tk < dom->Gfz.knb && ti < dom->Gfz.inb) {
     flag_w[ti + dom->Gfz.jsb*dom->Gfz.s1b + tk*dom->Gfz.s2b]
       = flag_w[ti + (dom->Gfz.je-1)*dom->Gfz.s1b + tk*dom->Gfz.s2b];
-  }
-}
-
-__global__ void cage_flag_w_periodic_N(int *flag_w, dom_struct *dom)
-{
-  int tk = blockDim.x*blockIdx.x + threadIdx.x;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(tk < dom->Gfz.knb && ti < dom->Gfz.inb) {
     flag_w[ti + (dom->Gfz.jeb-1)*dom->Gfz.s1b + tk*dom->Gfz.s2b]
       = flag_w[ti + dom->Gfz.js*dom->Gfz.s1b + tk*dom->Gfz.s2b];
   }
 }
 
-__global__ void cage_flag_w_periodic_B(int *flag_w, dom_struct *dom)
+__global__ void cage_flag_w_periodic_z(int *flag_w, dom_struct *dom)
 {
   int ti = blockDim.x*blockIdx.x + threadIdx.x;
   int tj = blockDim.y*blockIdx.y + threadIdx.y;
@@ -623,215 +402,133 @@ __global__ void cage_flag_w_periodic_B(int *flag_w, dom_struct *dom)
   if(ti < dom->Gfz.inb && tj < dom->Gfz.jnb) {
     flag_w[ti + tj*dom->Gfz.s1b + dom->Gfz.ksb*dom->Gfz.s2b]
       = flag_w[ti + tj*dom->Gfz.s1b + (dom->Gfz.ke-2)*dom->Gfz.s2b];
-  }
-}
-
-__global__ void cage_flag_w_periodic_T(int *flag_w, dom_struct *dom)
-{
-  int ti = blockDim.x*blockIdx.x + threadIdx.x;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y;
-
-  if(ti < dom->Gfz.inb && tj < dom->Gfz.jnb) {
     flag_w[ti + tj*dom->Gfz.s1b + (dom->Gfz.keb-1)*dom->Gfz.s2b]
       = flag_w[ti + tj*dom->Gfz.s1b + (dom->Gfz.ks+1)*dom->Gfz.s2b];
   }
 }
 
-__global__ void cage_flag_u_2(int p, int *flag_u, int *flag_v, int *flag_w,
-  part_struct *parts, dom_struct *dom, int *phase,
-  int js, int je, int ks, int ke)
+__global__ void cage_flag_u(int *flag_u, part_struct *parts, dom_struct *dom,
+  int *phase, int *phase_shell)
 {
   int i;    // iterator
-  int W, E, S, N, B, T; // flag locations
-  real xx;              // node Cartesian positions
-  real X;               // virtual particle position
 
-  int tj = blockDim.x*blockIdx.x + threadIdx.x + js;
-  int tk = blockDim.y*blockIdx.y + threadIdx.y + ks;
+  int W, E; // flag locations
 
-  if((tj < je) && (tk < ke)) {
-    X = parts[p].x;
-    if(parts[p].x < (dom->xs + parts[p].r)) X = parts[p].x + dom->xl;
-    for(i = parts[p].cage.is; i <= parts[p].cage.ibs; i++) {
-      if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        // if a v or w flag is set on this cell, flag u as well
-        W = i + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        E = (i+1) + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        S = i + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        N = i + (tj+1)*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        B = i + tj*dom->Gfz.s1b + tk*dom->Gfz.s2b;
-        T = i + tj*dom->Gfz.s1b + (tk+1)*dom->Gfz.s2b;
-        if(flag_v[S] < 1 || flag_v[N] < 1 || flag_w[B] < 1 || flag_w[T] < 1) {
-          // find location of this node to be flagged
-          xx = (i-DOM_BUF)*dom->dx + dom->xs;
-          if(xx < X - 0.5*dom->dx) {
-            if(flag_u[W] > 0) flag_u[W] = -1;
-          } else if(xx < X + 0.5*dom->dx) {
-            if(flag_u[W] > 0) flag_u[W] = -1;
-            if(flag_u[E] > 0) flag_u[E] = -1;
-          } else {
-            if(flag_u[E] > 0) flag_u[E] = -1;
-          }
-        }
-      }
-    }
-    X = parts[p].x;
-    if(parts[p].x > (dom->xe - parts[p].r)) X = parts[p].x - dom->xl;
-    for(i = parts[p].cage.ibe; i <= parts[p].cage.ie; i++) {
-      if(phase[i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        // if a v or w flag is set on this cell, flag u as well
-        W = i + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        E = (i+1) + tj*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        S = i + tj*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        N = i + (tj+1)*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        B = i + tj*dom->Gfz.s1b + tk*dom->Gfz.s2b;
-        T = i + tj*dom->Gfz.s1b + (tk+1)*dom->Gfz.s2b;
-        if(flag_v[S] < 1 || flag_v[N] < 1 || flag_w[B] < 1 || flag_w[T] < 1) {
-          // find location of this node to be flagged
-          xx = (i-DOM_BUF)*dom->dx + dom->xs;
-          if(xx < X - 0.5*dom->dx) {
-            if(flag_u[W] > 0) flag_u[W] = -1;
-          } else if(xx < X + 0.5*dom->dx) {
-            if(flag_u[W] > 0) flag_u[W] = -1;
-            if(flag_u[E] > 0) flag_u[E] = -1;
-          } else {
-            if(flag_u[E] > 0) flag_u[E] = -1;
-          }
-        }
-      }
+  int tj = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
+
+  if((tj < dom->Gcc.je) && (tk < dom->Gcc.ke)) {
+    for(i = dom->Gcc.is; i <= dom->Gcc.ie; i++) {
+      W = (i-1) + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+      E = i + tj*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+
+#ifdef STEPS
+      flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 
+        1 - ((phase[W] < 0 && phase[E] > -1) 
+            || (phase[W] > -1 && phase[E] < 0)
+            || ((phase_shell[W] < 1 && phase_shell[E] < 1)));
+#else
+      flag_u[i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 
+        1 - 2*((phase[W] < 0 && phase[E] > -1) 
+            || (phase[W] > -1 && phase[E] < 0)
+            || ((phase_shell[W] < 1 && phase_shell[E] < 1)));
+#endif
     }
   }
 }
 
-__global__ void cage_flag_v_2(int p, int *flag_u, int *flag_v, int *flag_w,
-  part_struct *parts, dom_struct *dom, int *phase,
-  int is, int ie, int ks, int ke)
+__global__ void cage_flag_v(int *flag_v, part_struct *parts, dom_struct *dom,
+  int *phase, int *phase_shell)
 {
   int j;    // iterator
-  int W, E, S, N, B, T; // flag locations
-  real yy;              // node Cartesian positions
-  real Y;               // virtual particle position
+  int S, N; // flag locations
 
-  int tk = blockDim.x*blockIdx.x + threadIdx.x + ks;
-  int ti = blockDim.y*blockIdx.y + threadIdx.y + is;
+  int tk = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int ti = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
 
-  if((tk < ke) && (ti < ie)) {
-    Y = parts[p].y;
-    if(parts[p].y < (dom->ys + parts[p].r)) Y = parts[p].y + dom->yl;
-    for(j = parts[p].cage.js; j <= parts[p].cage.jbs; j++) {
-      if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        // if a u or w flag is set on this cell, flag v as well
-        W = ti + j*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        E = (ti+1) + j*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        S = ti + j*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        N = ti + (j+1)*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        B = ti + j*dom->Gfz.s1b + tk*dom->Gfz.s2b;
-        T = ti + j*dom->Gfz.s1b + (tk+1)*dom->Gfz.s2b;
-        if(flag_u[W] < 1 || flag_u[E] < 1 || flag_w[B] < 1 || flag_w[T] < 1) {
-          // find location of this node to be flagged
-          yy = (j-DOM_BUF)*dom->dy + dom->ys;
-          if(yy < Y - 0.5*dom->dy) {
-            if(flag_v[S] > 0) flag_v[S] = -1;
-          } else if(yy < Y + 0.5*dom->dy) {
-            if(flag_v[S] > 0) flag_v[S] = -1;
-            if(flag_v[N] > 0) flag_v[N] = -1;
-          } else {
-            if(flag_v[N] > 0)flag_v[N] = -1;
-          }
-        }
-      }
-    }
-    Y = parts[p].y;
-    if(parts[p].y > (dom->ye - parts[p].r)) Y = parts[p].y - dom->yl;
-    for(j = parts[p].cage.jbe; j <= parts[p].cage.je; j++) {
-      if(phase[ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b] == p) {
-        // if a u or w flag is set on this cell, flag v as well
-        W = ti + j*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        E = (ti+1) + j*dom->Gfx.s1b + tk*dom->Gfx.s2b;
-        S = ti + j*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        N = ti + (j+1)*dom->Gfy.s1b + tk*dom->Gfy.s2b;
-        B = ti + j*dom->Gfz.s1b + tk*dom->Gfz.s2b;
-        T = ti + j*dom->Gfz.s1b + (tk+1)*dom->Gfz.s2b;
-        if(flag_u[W] < 1 || flag_u[E] < 1 || flag_w[B] < 1 || flag_w[T] < 1) {
-          // find location of this node to be flagged
-          yy = (j-DOM_BUF)*dom->dy + dom->ys;
-          if(yy < Y - 0.5*dom->dy) {
-            if(flag_v[S] > 0) flag_v[S] = -1;
-          } else if(yy < Y + 0.5*dom->dy) {
-            if(flag_v[S] > 0) flag_v[S] = -1;
-            if(flag_v[N] > 0) flag_v[N] = -1;
-          } else {
-            if(flag_v[N] > 0) flag_v[N] = -1;
-          }
-        }
-      }
+  if((tk < dom->Gcc.ke) && (ti < dom->Gcc.ie)) {
+    for(j = dom->Gcc.js; j <= dom->Gcc.je; j++) {
+      S = ti + (j-1)*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+      N = ti + j*dom->Gcc.s1b + tk*dom->Gcc.s2b;
+
+#ifdef STEPS
+      flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 
+        1 - ((phase[S] < 0 && phase[N] > -1)
+            || (phase[S] > -1 && phase[N] < 0)
+            || ((phase_shell[S] < 1 && phase_shell[N] < 1))); 
+#else
+      flag_v[ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 
+        1 - 2*((phase[S] < 0 && phase[N] > -1)
+            || (phase[S] > -1 && phase[N] < 0)
+            || ((phase_shell[S] < 1 && phase_shell[N] < 1))); 
+#endif
     }
   }
 }
 
-__global__ void cage_flag_w_2(int p, int *flag_u, int *flag_v, int *flag_w,
-  part_struct *parts, dom_struct *dom, int *phase,
-  int is, int ie, int js, int je)
+__global__ void cage_flag_w(int *flag_w, part_struct *parts, dom_struct *dom, 
+  int *phase, int *phase_shell)
 {
   int k;    // iterator
-  int W, E, S, N, B, T; // flag locations
-  real zz;              // node Cartesian positions
-  real Z;               // virtual particle positon
+  int B, T; // flag locations
 
-  int ti = blockDim.x*blockIdx.x + threadIdx.x + is;
-  int tj = blockDim.y*blockIdx.y + threadIdx.y + js;
+  int ti = blockDim.x*blockIdx.x + threadIdx.x + DOM_BUF;
+  int tj = blockDim.y*blockIdx.y + threadIdx.y + DOM_BUF;
 
-  if((ti < ie) && (tj < je)) {
-    Z = parts[p].z;
-    if(parts[p].z < (dom->zs + parts[p].r)) Z = parts[p].z + dom->zl;
-    for(k = parts[p].cage.ks; k <= parts[p].cage.kbs; k++) {
-      if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p) {
-        // if a u or v flag is set on this cell, flag w as well
-        W = ti + tj*dom->Gfx.s1b + k*dom->Gfx.s2b;
-        E = (ti+1) + tj*dom->Gfx.s1b + k*dom->Gfx.s2b;
-        S = ti + tj*dom->Gfy.s1b + k*dom->Gfy.s2b;
-        N = ti + (tj+1)*dom->Gfy.s1b + k*dom->Gfy.s2b;
-        B = ti + tj*dom->Gfz.s1b + k*dom->Gfz.s2b;
-        T = ti + tj*dom->Gfz.s1b + (k+1)*dom->Gfz.s2b;
-        if(flag_u[W] < 1 || flag_u[E] < 1 || flag_v[S] < 1 || flag_v[N] < 1) {
-          // find location of this node to be flagged
-          zz = (k-DOM_BUF)*dom->dz + dom->zs;
-          if(zz < Z - 0.5*dom->dz) {
-            if(flag_w[B] > 0) flag_w[B] = -1;
-          } else if(zz < Z + 0.5*dom->dz) {
-            if(flag_w[B] > 0) flag_w[B] = -1;
-            if(flag_w[T] > 0) flag_w[T] = -1;
-          } else {
-            if(flag_w[T] > 0) flag_w[T] = -1;
-          }
-        }
-      }
+  if((ti < dom->Gcc.ie) && (tj < dom->Gcc.je)) {
+    for(k = dom->Gcc.ks; k <= dom->Gcc.ke; k++) {
+      B = ti + tj*dom->Gcc.s1b + (k-1)*dom->Gcc.s2b;
+      T = ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b;
+
+#ifdef STEPS
+      flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 
+        1 - ((phase[B] < 0 && phase[T] > -1)
+            || (phase[B] > -1 && phase[T] < 0)
+            || ((phase_shell[B] < 1 && phase_shell[T] < 1)));
+#else
+      flag_w[ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b] = 
+        1 - 2*((phase[B] < 0 && phase[T] > -1)
+            || (phase[B] > -1 && phase[T] < 0)
+            || ((phase_shell[B] < 1 && phase_shell[T] < 1)));
+#endif
+
     }
-    Z = parts[p].z;
-    if(parts[p].z > (dom->ze - parts[p].r)) Z = parts[p].z - dom->zl;
-    for(k = parts[p].cage.kbe; k <= parts[p].cage.ke; k++) {
-      if(phase[ti + tj*dom->Gcc.s1b + k*dom->Gcc.s2b] == p) {
-        // if a u or v flag is set on this cell, flag w as well
-        W = ti + tj*dom->Gfx.s1b + k*dom->Gfx.s2b;
-        E = (ti+1) + tj*dom->Gfx.s1b + k*dom->Gfx.s2b;
-        S = ti + tj*dom->Gfy.s1b + k*dom->Gfy.s2b;
-        N = ti + (tj+1)*dom->Gfy.s1b + k*dom->Gfy.s2b;
-        B = ti + tj*dom->Gfz.s1b + k*dom->Gfz.s2b;
-        T = ti + tj*dom->Gfz.s1b + (k+1)*dom->Gfz.s2b;
-        if(flag_u[W] < 1 || flag_u[E] < 1 || flag_v[S] < 1 || flag_v[N] < 1) {
-          // find location of this node to be flagged
-          zz = (k-DOM_BUF)*dom->dz + dom->zs;
-          if(zz < Z - 0.5*dom->dz) {
-            if(flag_w[B] > 0) flag_w[B] = -1;
-          } else if(zz < Z + 0.5*dom->dz) {
-            if(flag_w[B] > 0) flag_w[B] = -1;
-            if(flag_w[T] > 0) flag_w[T] = -1;
-          } else {
-            if(flag_w[T] > 0) flag_w[T] = -1;
-          }
-        }
-      }
-    }
+  }
+}
+
+__global__ void flag_external_u(int *flag_u, dom_struct *dom)
+{
+  
+  int tj = blockDim.x*blockIdx.x + threadIdx.x;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y;
+  
+  if((tj < dom->Gfx._jnb) && (tk < dom->Gfx._knb)) {
+    flag_u[dom->Gfx._is + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
+    flag_u[dom->Gfx._ie-1 + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b] = 0;
+  }
+}
+      
+__global__ void flag_external_v(int *flag_v, dom_struct *dom)
+{
+  
+  int tk = blockDim.x*blockIdx.x + threadIdx.x;
+  int ti = blockDim.y*blockIdx.y + threadIdx.y;
+  
+  if((tk < dom->Gfy._knb) && (ti < dom->Gfy._inb)) {
+    flag_v[ti + dom->Gfy._js*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
+    flag_v[ti + (dom->Gfy._je-1)*dom->Gfy._s1b + tk*dom->Gfy._s2b] = 0;
+  }
+}
+
+__global__ void flag_external_w(int *flag_w, dom_struct *dom)
+{
+  
+  int ti = blockDim.x*blockIdx.x + threadIdx.x;
+  int tj = blockDim.y*blockIdx.y + threadIdx.y;
+  
+  if((ti < dom->Gfz._inb) && (tj < dom->Gfz._jnb)) {
+    flag_w[ti + tj*dom->Gfz._s1b + dom->Gfz._ks*dom->Gfz._s2b] = 0;
+    flag_w[ti + tj*dom->Gfz._s1b + (dom->Gfz._ke-1)*dom->Gfz._s2b] = 0;
   }
 }
 
@@ -904,14 +601,14 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
         uu = 0;
       }
       x = (i-DOM_BUF) * dom->dx + dom->xs - X;
-      if(x < dom->xs) x += dom->xl;
-      if(x > dom->xe) x -= dom->xl;
+      if(x < dom->xs - 0.5*dom->dx) x += dom->xl;
+      if(x > dom->xe + 0.5*dom->dx) x -= dom->xl;
       y = (tj-0.5) * dom->dy + dom->ys - Y;
-      if(y < dom->ys) y += dom->yl;
-      if(y > dom->ye) y -= dom->yl;
+      if(y < dom->ys - 0.5*dom->dy) y += dom->yl;
+      if(y > dom->ye + 0.5*dom->dy) y -= dom->yl;
       z = (tk-0.5) * dom->dz + dom->zs - Z;
-      if(z < dom->zs) z += dom->zl;
-      if(z > dom->ze) z -= dom->zl;
+      if(z < dom->zs - 0.5*dom->dz) z += dom->zl;
+      if(z > dom->ze + 0.5*dom->dz) z -= dom->zl;
       xyz2rtp(x, y, z, &r, &theta, &phi);
 
       // calculate analytic solution
@@ -924,14 +621,14 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
         chinm_re, chinm_im,
         P, stride, &Ux, &Uy, &Uz);
 
-      // switch reference frame and set boundary condition
+
       real ocrossr_x = oy*z - oz*y;
       real odotcrossr_x = oydot*z - ozdot*y;
       Ux += uu + ocrossr_x;
-      Ux -= 0.1/nu *(r*r-a*a) * odotcrossr_x;
+      Ux += 0.1/nu *(r*r*r*r*r-a*a*a*a*a)/(r*r*r) * odotcrossr_x;
       // boolean check if this is an analytically-posed node
       int check = (flag_u[C] < 1) && (PP > -1);
-      u[C] = check * Ux + (check - 1) * u[C];
+      u[C] = check * Ux + (1 - check) * u[C];
 #endif
     }
   }
@@ -1006,14 +703,14 @@ __global__ void part_BC_v(real *v, int *phase, int *flag_v,
         vv = 0;
       }
       x = (ti-0.5) * dom->dx + dom->xs - X;
-      if(x < dom->xs) x += dom->xl;
-      if(x > dom->xe) x -= dom->xl;
+      if(x < dom->xs - 0.5*dom->dx) x += dom->xl;
+      if(x > dom->xe + 0.5*dom->dx) x -= dom->xl;
       y = (j-DOM_BUF) * dom->dy + dom->ys - Y;
-      if(y < dom->ys) y += dom->yl;
-      if(y > dom->ye) y -= dom->yl;
+      if(y < dom->ys - 0.5*dom->dy) y += dom->yl;
+      if(y > dom->ye + 0.5*dom->dy) y -= dom->yl;
       z = (tk-0.5) * dom->dz + dom->zs - Z;
-      if(z < dom->zs) z += dom->zl;
-      if(z > dom->ze) z -= dom->zl;
+      if(z < dom->zs - 0.5*dom->dx) z += dom->zl;
+      if(z > dom->ze + 0.5*dom->dz) z -= dom->zl;
       xyz2rtp(x, y, z, &r, &theta, &phi);
 
       // calculate analytic solution
@@ -1030,10 +727,10 @@ __global__ void part_BC_v(real *v, int *phase, int *flag_v,
       real ocrossr_y = -(ox*z - oz*x);
       real odotcrossr_y = -(oxdot*z - ozdot*x);
       Uy += vv + ocrossr_y;
-      Uy -= 0.1/nu *(r*r-a*a) * odotcrossr_y;
+      Uy += 0.1/nu *(r*r*r*r*r-a*a*a*a*a)/(r*r*r) * odotcrossr_y;
       // boolean check if this is an analytically-posed node
       int check = (flag_v[C] < 1) && (PP > -1);
-      v[C] = check * Uy + (check - 1) * v[C];
+      v[C] = check * Uy + (1 - check) * v[C];
 #endif
     }
   }
@@ -1108,14 +805,14 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
         ww = 0;
       }
       x = (ti-0.5) * dom->dx + dom->xs - X;
-      if(x < dom->xs) x += dom->xl;
-      if(x > dom->xe) x -= dom->xl;
+      if(x < dom->xs - 0.5*dom->dx) x += dom->xl;
+      if(x > dom->xe + 0.5*dom->dx) x -= dom->xl;
       y = (tj-0.5) * dom->dy + dom->ys - Y;
-      if(y < dom->ys) y += dom->yl;
-      if(y > dom->ye) y -= dom->yl;
+      if(y < dom->ys - 0.5*dom->dy) y += dom->yl;
+      if(y > dom->ye + 0.5*dom->dy) y -= dom->yl;
       z = (k-DOM_BUF) * dom->dz + dom->zs - Z;
-      if(z < dom->zs) z += dom->zl;
-      if(z > dom->ze) z -= dom->zl;
+      if(z < dom->zs - 0.5*dom->dz) z += dom->zl;
+      if(z > dom->ze + 0.5*dom->dz) z -= dom->zl;
       xyz2rtp(x, y, z, &r, &theta, &phi);
 
       // calculate analytic solution
@@ -1132,10 +829,10 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
       real ocrossr_z = ox*y - oy*x;
       real odotcrossr_z = oxdot*y - oydot*x;
       Uz += ww + ocrossr_z;
-      Uz -= 0.1/nu *(r*r-a*a) * odotcrossr_z;
+      Uz += 0.1/nu *(r*r*r*r*r-a*a*a*a*a)/(r*r*r) * odotcrossr_z;
       // boolean check if this is an analytically-posed node
       int check = (flag_w[C] < 1) && (PP > -1);
-      w[C] = check * Uz + (check - 1) * w[C];
+      w[C] = check * Uz + (1 - check) * w[C];
 #endif
     }
   }
@@ -1143,7 +840,7 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
 
 __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
   part_struct *parts, dom_struct *dom,
-  real mu, real nu, real dt, gradP_struct gradP, real rho_f, int stride,
+  real mu, real nu, real dt, real dt0, gradP_struct gradP, real rho_f, int stride,
   real *pnm_re00, real *pnm_im00, real *phinm_re00, real *phinm_im00,
   real *chinm_re00, real *chinm_im00,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
@@ -1155,7 +852,7 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
   real x, y, z;         // pressure node location Cartesian
   real X, Y, Z;         // particle position
   real r, theta, phi;   // velocity node location spherical
-  real pp_tmp, pp_tmp00;// temporary pressure
+  real pp_tmp;//, pp_tmp00;// temporary pressure
   int P;            // particle number
   real a;               // particle radius
   int order;            // particle order
@@ -1212,19 +909,19 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
       real ar = a / r;
       real ra = r / a;
       pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride);
-      pp_tmp00 = X_pn(0, theta, phi, pnm_re00, pnm_im00, P, stride);
+      //pp_tmp00 = X_pn(0, theta, phi, pnm_re00, pnm_im00, P, stride);
       for(int n = 1; n <= order; n++) {
         pp_tmp += (1.-0.5*n*(2.*n-1.)/(n+1.)*pow(ar,2.*n+1.))*pow(ra,n)
           * X_pn(n, theta, phi, pnm_re, pnm_im, P, stride);
-        pp_tmp00 += (1.-0.5*n*(2.*n-1.)/(n+1.)*pow(ar,2.*n+1.))*pow(ra,n)
-          * X_pn(n, theta, phi, pnm_re00, pnm_im00, P, stride);
+        //pp_tmp00 += (1.-0.5*n*(2.*n-1.)/(n+1.)*pow(ar,2.*n+1.))*pow(ra,n)
+          //* X_pn(n, theta, phi, pnm_re00, pnm_im00, P, stride);
         pp_tmp -= n*(2.*n-1.)*(2.*n+1.)/(n+1.)*pow(ar,n+1.)
           * X_phin(n, theta, phi, phinm_re, phinm_im, P, stride);
-        pp_tmp00 -= n*(2.*n-1.)*(2.*n+1.)/(n+1.)*pow(ar,n+1.)
-          * X_phin(n, theta, phi, phinm_re00, phinm_im00, P, stride);
+        //pp_tmp00 -= n*(2.*n-1.)*(2.*n+1.)/(n+1.)*pow(ar,n+1.)
+          //* X_phin(n, theta, phi, phinm_re00, phinm_im00, P, stride);
       }
       pp_tmp *= mu*nu/(a*a);
-      pp_tmp00 *= mu*nu/(a*a);
+      //pp_tmp00 *= mu*nu/(a*a);
       real ocrossr2 = (oy*z - oz*y) * (oy*z - oz*y);
       ocrossr2 += (ox*z - oz*x) * (ox*z - oz*x);
       ocrossr2 += (ox*y - oy*x) * (ox*y - oy*x);
@@ -1232,11 +929,90 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
       real accdotr = (-gradP.x/rhoV - udot)*x + (-gradP.y/rhoV - vdot)*y
         + (-gradP.z/rhoV - wdot)*z;
       pp_tmp += 0.5 * rho_f * ocrossr2 + rho_f * accdotr;
-      pp_tmp00 += 0.5 * rho_f * ocrossr2 + rho_f * accdotr;
+      //pp_tmp00 += 0.5 * rho_f * ocrossr2 + rho_f * accdotr;
       // write BC if flagged, otherwise leave alone
       p_rhs[C] = (real) phase_shell[CC] * p_rhs[C]
-        + (real) (1 - phase_shell[CC]) * ((0.5*(pp_tmp + pp_tmp00)-p[CC])
-        + 0.5*nu*dt*p_rhs[C]);
+        + (real) (1 - phase_shell[CC])
+        * ((pp_tmp - p[CC]) + 0.5*mu*p_rhs[C]);
+      p_rhs[C] = (real) (phase[CC] < 0 && phase_shell[CC]) * p_rhs[C];
+#endif
+    }
+  }
+}
+
+__global__ void part_BC_p_fill(real *p, int *phase,
+  part_struct *parts, dom_struct *dom,
+  real mu, real nu, real rho_f, gradP_struct gradP, int stride,
+  real *pnm_re, real *pnm_im)
+{
+  int tj = blockDim.x*blockIdx.x + threadIdx.x + dom->Gcc._js;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y + dom->Gcc._ks;
+  int CC;
+  real x, y, z;         // pressure node location Cartesian
+  real X, Y, Z;         // particle position
+  real r, theta, phi;   // velocity node location spherical
+  real pp_tmp;//, pp_tmp00;// temporary pressure
+  int P;            // particle number
+  real a;               // particle radius
+  real ox, oy, oz;      // particle angular velocity
+  real udot, vdot, wdot;// particle acceleration
+
+  if(tj < dom->Gcc._je && tk < dom->Gcc._ke) {
+    for(int i = dom->Gcc._is; i < dom->Gcc._ie; i++) {
+      CC = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      // get particle number
+      P = phase[CC];
+      if(P > -1) {
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        ox = parts[P].ox;
+        oy = parts[P].oy;
+        oz = parts[P].oz;
+        udot = parts[P].udot;
+        vdot = parts[P].vdot;
+        wdot = parts[P].wdot;
+      } else {
+        P = 0;
+        a = (dom->dx + dom->dy + dom->dz) / 3.;
+        X = (i-0.5) * dom->dx + dom->xs + a;
+        Y = (tj-0.5) * dom->dy + dom->ys + a;
+        Z = (tk-0.5) * dom->dz + dom->zs + a;
+        ox = 0;
+        oy = 0;
+        oz = 0;
+        udot = 0;
+        vdot = 0;
+        wdot = 0;
+      }
+      x = (i-0.5) * dom->dx + dom->xs - X;
+      if(x < dom->xs) x += dom->xl;
+      if(x > dom->xe) x -= dom->xl;
+      y = (tj-0.5) * dom->dy + dom->ys - Y;
+      if(y < dom->ys) y += dom->yl;
+      if(y > dom->ye) y -= dom->yl;
+      z = (tk-0.5) * dom->dz + dom->zs - Z;
+      if(z < dom->zs) z += dom->zl;
+      if(z > dom->ze) z -= dom->zl;
+      xyz2rtp(x, y, z, &r, &theta, &phi);
+
+      // calculate analytic solution
+#ifdef STEPS
+      p[CC] = phase_shell[CC] * p[CC];
+#else
+      pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride);
+      pp_tmp *= mu*nu/(a*a);
+      real ocrossr2 = (oy*z - oz*y) * (oy*z - oz*y);
+      ocrossr2 += (ox*z - oz*x) * (ox*z - oz*x);
+      ocrossr2 += (ox*y - oy*x) * (ox*y - oy*x);
+      real rhoV = rho_f;
+      real accdotr = (-gradP.x/rhoV - udot)*x + (-gradP.y/rhoV - vdot)*y
+        + (-gradP.z/rhoV - wdot)*z;
+      pp_tmp += 0.5 * rho_f * ocrossr2 + rho_f * accdotr;
+      // write BC if inside particle, otherwise leave alone
+      p[CC] = (real) (phase[CC] > -1) * pp_tmp
+        + (1 - (phase[CC] > -1)) * p[CC];
 #endif
     }
   }
@@ -1548,32 +1324,43 @@ __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
   real ut = 0.5*ra*Y_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride);
   real up = 0.5*ra*Z_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride);
 
+
   for(int n = 1; n <= order; n++) {
-    ur += (0.5*n/(2.*n+3.)*pow(ra,n+1.)
-      + 0.25*n*((2.*n+1.)/(2.*n+3.)*ar*ar-1.)*pow(ar,n))
+    real powranp1 = pow(ra,n+1.);
+    real powranm1 = pow(ra,n-1.);
+
+    real powarnp2 = pow(ar,n+2.);
+    real powarnp1 = pow(ar,n+1.);
+    real powarn = pow(ar,n);
+
+    real od2np3 = 1./(2.*n+3.);
+    real odnp1 = 1./(n+1.);
+
+    ur += (0.5*n*od2np3*powranp1
+      + 0.25*n*((2.*n+1.)*od2np3*ar*ar-1.)*powarn)
       * X_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
-    ur += (n*pow(ra,n-1.)
+    ur += (n*powranm1
       + 0.5*n*(2.*n-1.-(2.*n+1.)*ra*ra)*pow(ar,n+2.))
       * X_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
 
-    ut += (0.5*(n+3.)/(n+1.)/(2.*n+3.)*pow(ra,n+1.)
-      + 0.25/(n+1.)*(n-2.-n*(2.*n+1.)/(2.*n+3.)*ar*ar)*pow(ar,n))
+    ut += (0.5*(n+3.)*odnp1*od2np3*powranp1
+      + 0.25*odnp1*(n-2.-n*(2.*n+1.)*od2np3*ar*ar)*powarn)
       * Y_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
-    ut += (pow(ra,n-1.)
-      + 0.5/(n+1.)*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*pow(ar,n+2.))
+    ut += (powranm1
+      + 0.5*odnp1*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*powarnp2)
       * Y_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
-    ut += (pow(ra,n-1.)
-      - pow(ar,n+1.))
+    ut += (powranm1
+      - powarnp1)
       * Z_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride);
       
-    up += (0.5*(n+3.)/(n+1.)/(2.*n+3.)*pow(ra,n+1.)
-      + 0.25/(n+1.)*(n-2.-n*(2.*n+1.)/(2.*n+3.)*ar*ar)*pow(ar,n))
+    up += (0.5*(n+3.)*odnp1*od2np3*powranp1
+      + 0.25*odnp1*(n-2.-n*(2.*n+1.)*od2np3*ar*ar)*powarn)
       * Z_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
-    up += (pow(ra,n-1.)
-      + 0.5/(n+1.)*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*pow(ar,n+2.))
+    up += (powranm1
+      + 0.5*odnp1*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*powarnp2)
       * Z_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
-    up += (-pow(ra,n-1.)
-      + pow(ar,n+1.))
+    up += (-powranm1
+      + powarnp1)
       * Y_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride);
   }
   ur *= nu / a;

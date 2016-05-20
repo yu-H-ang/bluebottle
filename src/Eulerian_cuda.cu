@@ -1,11 +1,14 @@
-#include "cuda_Eulerian.h"
+#include <cuda.h>
+#include <thrust/device_ptr.h>
+#include <thrust/reduce.h>
+#include <thrust/functional.h>
+#include <thrust/sort.h>
+
+#include "Eulerian_cuda.h"
 #include "cuda_bluebottle.h"
 #include "bluebottle.h"
 #include "Eulerian.h"
 #include "entrySearch.h"
-
-#include <cuda.h>
-#include <helper_cuda.h>
 
 extern "C"
 void cuda_Eulerian_push(void)
@@ -17,7 +20,7 @@ void cuda_Eulerian_push(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		// set up host working arrays for subdomain copy from host to device
 		real *nn = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
@@ -167,44 +170,10 @@ void cuda_Eulerian_push(void)
 		
 		// face-centered bubble density
 		if(gravity_direction == GRAVITY_X) {
-			/*
-			real *bdenf = (real*) malloc(dom[dev].Gfx.s3b * sizeof(real));
 			
-			for(k = dom[dev].Gfx.ksb; k < dom[dev].Gfx.keb; k++) {
-				for(j = dom[dev].Gfx.jsb; j < dom[dev].Gfx.jeb; j++) {
-					for(i = dom[dev].Gfx.isb; i < dom[dev].Gfx.ieb; i++) {
-						ii = i - dom[dev].Gfx.isb;
-						jj = j - dom[dev].Gfx.jsb;
-						kk = k - dom[dev].Gfx.ksb;
-						C = i + j * Dom.Gfx.s1b + k * Dom.Gfx.s2b;
-						CC = ii + jj * dom[dev].Gfx.s1b + kk * dom[dev].Gfx.s2b;
-						bdenf[CC] = bubden_face[C];
-					}
-				}
-			}
-			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfx.s3b, cudaMemcpyHostToDevice));
-			free(bdenf);
-			*/
 		}
 		else if(gravity_direction == GRAVITY_Y) {
-			/*
-			real *bdenf = (real*) malloc(dom[dev].Gfy.s3b * sizeof(real));
 			
-			for(k = dom[dev].Gfy.ksb; k < dom[dev].Gfy.keb; k++) {
-				for(j = dom[dev].Gfy.jsb; j < dom[dev].Gfy.jeb; j++) {
-					for(i = dom[dev].Gfy.isb; i < dom[dev].Gfy.ieb; i++) {
-						ii = i - dom[dev].Gfy.isb;
-						jj = j - dom[dev].Gfy.jsb;
-						kk = k - dom[dev].Gfy.ksb;
-						C = i + j * Dom.Gfy.s1b + k * Dom.Gfy.s2b;
-						CC = ii + jj * dom[dev].Gfy.s1b + kk * dom[dev].Gfy.s2b;
-						bdenf[CC] = bubden_face[C];
-					}
-				}
-			}
-			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfy.s3b, cudaMemcpyHostToDevice));
-			free(bdenf);
-			*/
 		}
 		else if(gravity_direction == GRAVITY_Z) {
 			
@@ -221,9 +190,10 @@ void cuda_Eulerian_push(void)
 					}
 				}
 			}
-			checkCudaErrors(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyHostToDevice));
+			(cudaMemcpy(_bubden_face[dev], bdenf, sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyHostToDevice));
 			free(bdenf);
 			
+			/*
 			real *nGau = (real*) malloc(dom[dev].Gfz.s2b * sizeof(real));
 			for(j = dom[dev].Gfz.jsb; j < dom[dev].Gfz.jeb; j++) {
 				for(i = dom[dev].Gfz.isb; i < dom[dev].Gfz.ieb; i++) {
@@ -234,7 +204,7 @@ void cuda_Eulerian_push(void)
 					nGau[CC] = numGau[C];
 				}
 			}
-			checkCudaErrors(cudaMemcpy(_numGau[dev], nGau, sizeof(real) * dom[dev].Gfz.s2b, cudaMemcpyHostToDevice));
+			(cudaMemcpy(_numGau[dev], nGau, sizeof(real) * dom[dev].Gfz.s2b, cudaMemcpyHostToDevice));
 			free(nGau);
 			
 			real *mGau = (real*) malloc(dom[dev].Gfz.s2b * sizeof(real));
@@ -247,23 +217,21 @@ void cuda_Eulerian_push(void)
 					mGau[CC] = masGau[C];
 				}
 			}
-			checkCudaErrors(cudaMemcpy(_masGau[dev], mGau, sizeof(real) * dom[dev].Gfz.s2b, cudaMemcpyHostToDevice));
+			(cudaMemcpy(_masGau[dev], mGau, sizeof(real) * dom[dev].Gfz.s2b, cudaMemcpyHostToDevice));
 			free(mGau);
+			*/
 		}
 		
 		
 		
 		// copy from host to device
-		checkCudaErrors(cudaMemcpy(_numden[dev], nn, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_bubmas[dev], bubm, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_concen[dev], cc, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		//checkCudaErrors(cudaMemcpy(_u_p[dev], uu_p, sizeof(real) * dom[dev].Gfx.s3b, cudaMemcpyHostToDevice));
-		//checkCudaErrors(cudaMemcpy(_v_p[dev], vv_p, sizeof(real) * dom[dev].Gfy.s3b, cudaMemcpyHostToDevice));
-		//checkCudaErrors(cudaMemcpy(_w_p[dev], ww_p, sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_bubden[dev], bden, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_concen_sat[dev], ccsat, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_BGndot[dev], bubgen_num, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(_BGmdot[dev], bubgen_mas, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_numden[dev], nn, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_bubmas[dev], bubm, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_concen[dev], cc, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_bubden[dev], bden, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_concen_sat[dev], ccsat, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_BGndot[dev], bubgen_num, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_BGmdot[dev], bubgen_mas, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
 		
 		// free host subdomain working arrays
 		free(nn);
@@ -273,9 +241,6 @@ void cuda_Eulerian_push(void)
 		free(ccsat);
 		free(bubgen_num);
 		free(bubgen_mas);
-		//free(uu_p);
-		//free(vv_p);
-		//free(ww_p);
 	}
 }
 
@@ -289,21 +254,21 @@ void cuda_Eulerian_pull(void)
 		int C, CC;            // cell references
 		
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 
 		// host working arrays for subdomain copy from device to host
 		real *nn = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
-		real *bubm = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		real *cc = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
-		real *wb = (real*) malloc(dom[dev].Gfz.s3b * sizeof(real));
+		real *ter = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
+		real *bubm = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		real *bdia = (real*) malloc(dom[dev].Gcc.s3b * sizeof(real));
 		
 		// copy from device to host
-		checkCudaErrors(cudaMemcpy(nn, _numden[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
-		checkCudaErrors(cudaMemcpy(bubm, _bubmas[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
-		checkCudaErrors(cudaMemcpy(cc, _concen[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
-		checkCudaErrors(cudaMemcpy(wb, _w_b[dev], sizeof(real) * dom[dev].Gfz.s3b, cudaMemcpyDeviceToHost));
-		checkCudaErrors(cudaMemcpy(bdia, _bubdia[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
+		(cudaMemcpy(nn, _numden[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
+		(cudaMemcpy(cc, _concen[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
+		(cudaMemcpy(bdia, _bubdia[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
+		(cudaMemcpy(bubm, _bubmas[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
+		(cudaMemcpy(ter, _ter_cell[dev], sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyDeviceToHost));
 		
 		// fill in apropriate subdomain (copy back ghost cells)
 		// numden
@@ -328,7 +293,7 @@ void cuda_Eulerian_pull(void)
 					kk = k - dom[dev].Gfz.ksb;
 					C = i + j * Dom.Gfz.s1b + k * Dom.Gfz.s2b;
 					CC = ii + jj * dom[dev].Gfz.s1b + kk * dom[dev].Gfz.s2b;
-					w_b[C] = wb[CC];
+					ter_cell[C] = ter[CC];
 				}
 			}
 		}
@@ -373,9 +338,9 @@ void cuda_Eulerian_pull(void)
 		
 		// free host subdomain working arrays
 		free(nn);
-		free(bubm);
 		free(cc);
-		free(wb);
+		free(ter);
+		free(bubm);
 		free(bdia);
 	}
 }
@@ -387,30 +352,28 @@ void cuda_Eulerian_free(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
-		checkCudaErrors(cudaFree(_numden[dev]));
-		checkCudaErrors(cudaFree(_nextnumden[dev]));
-		checkCudaErrors(cudaFree(_w_b[dev]));
-		checkCudaErrors(cudaFree(_ter_cell[dev]));
-		checkCudaErrors(cudaFree(_f_z_coupling_numden[dev]));
-		checkCudaErrors(cudaFree(_numGau[dev]));
-		checkCudaErrors(cudaFree(_masGau[dev]));
-		checkCudaErrors(cudaFree(_BGndot[dev]));
-		checkCudaErrors(cudaFree(_BGmdot[dev]));
+		(cudaFree(_numden[dev]));
+		(cudaFree(_nextnumden[dev]));
+		(cudaFree(_w_b[dev]));
+		(cudaFree(_ter_cell[dev]));
+		(cudaFree(_f_z_coupling_numden[dev]));
+		(cudaFree(_BGndot[dev]));
+		(cudaFree(_BGmdot[dev]));
 		
-		checkCudaErrors(cudaFree(_bubmas[dev]));
-		checkCudaErrors(cudaFree(_nextbubmas[dev]));
-		checkCudaErrors(cudaFree(_bubdia[dev]));
-		checkCudaErrors(cudaFree(_bubdiafz[dev]));
+		(cudaFree(_bubmas[dev]));
+		(cudaFree(_nextbubmas[dev]));
+		(cudaFree(_bubdia[dev]));
+		(cudaFree(_bubdiafz[dev]));
 		
-		checkCudaErrors(cudaFree(_concen[dev]));
-		checkCudaErrors(cudaFree(_nextconcen[dev]));
-		checkCudaErrors(cudaFree(_velmag[dev]));
-		checkCudaErrors(cudaFree(_mdot[dev]));
-		checkCudaErrors(cudaFree(_bubden[dev]));
-		checkCudaErrors(cudaFree(_bubden_face[dev]));
-		checkCudaErrors(cudaFree(_concen_sat[dev]));
+		(cudaFree(_concen[dev]));
+		(cudaFree(_nextconcen[dev]));
+		(cudaFree(_velmag[dev]));
+		(cudaFree(_mdot[dev]));
+		(cudaFree(_bubden[dev]));
+		(cudaFree(_bubden_face[dev]));
+		(cudaFree(_concen_sat[dev]));
 	}
 	
 	// free device memory on host
@@ -419,8 +382,6 @@ void cuda_Eulerian_free(void)
 	free(_w_b);
 	free(_ter_cell);
 	free(_f_z_coupling_numden);
-	free(_numGau);
-	free(_masGau);
 	free(_BGndot);
 	free(_BGmdot);
 	
@@ -445,7 +406,7 @@ void cuda_numberdensity_BC(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
@@ -597,8 +558,7 @@ void cuda_numberdensity_BC(void)
 					BC_p_B_N<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-				// NOTE!: because we use upwinding, here we use 0.5*bc
-					//BC_p_B_D_Gaussian<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev], _numGau_temp[dev]);
+					BC_p_B_ghost_D<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev]);
 					break;
 			}
 		}
@@ -629,7 +589,7 @@ void cuda_numberdensity_BC(void)
 					BC_p_T_N<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-					//BC_p_T_D<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev], numdenBC.nTD);
+					BC_p_T_ghost_D<<<numBlocks_n, dimBlocks_n>>>(_numden[dev], _dom[dev]);
 					break;
 			}
 		}
@@ -643,7 +603,7 @@ void cuda_numberdensity_march(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_y = 0;
 		int threads_z = 0;
@@ -689,7 +649,7 @@ void cuda_add_terminal_velz(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int blocks_x = 0;
@@ -783,27 +743,11 @@ void cuda_Eulerian_malloc(void)
 	cpumem += nsubdom * sizeof(real*);
 	_nextnumden = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
-	//_u_p = (real**) malloc(nsubdom * sizeof(real*));
-	//cpumem += nsubdom * sizeof(real*);
-	//_v_p = (real**) malloc(nsubdom * sizeof(real*));
-	//cpumem += nsubdom * sizeof(real*);
 	_w_b = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
 	_ter_cell = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
-	//_f_x_coupling_numden = (real**) malloc(nsubdom * sizeof(real*));
-	//cpumem += nsubdom * sizeof(real*);
-	//_f_y_coupling_numden = (real**) malloc(nsubdom * sizeof(real*));
-	//cpumem += nsubdom * sizeof(real*);
 	_f_z_coupling_numden = (real**) malloc(nsubdom * sizeof(real*));
-	cpumem += nsubdom * sizeof(real*);
-	_numGau = (real**) malloc(nsubdom * sizeof(real*));
-	cpumem += nsubdom * sizeof(real*);
-	_masGau = (real**) malloc(nsubdom * sizeof(real*));
-	cpumem += nsubdom * sizeof(real*);
-	_numGau_temp = (real**) malloc(nsubdom * sizeof(real*));
-	cpumem += nsubdom * sizeof(real*);
-	_masGau_temp = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
 	_BGndot = (real**) malloc(nsubdom * sizeof(real*));
 	cpumem += nsubdom * sizeof(real*);
@@ -838,76 +782,78 @@ void cuda_Eulerian_malloc(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		// number density equation
-		checkCudaErrors(cudaMalloc((void**) &(_numden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_numden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		// _numden_next is to store _numden in next time step, only exist on deivce.
-		checkCudaErrors(cudaMalloc((void**) &(_nextnumden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_nextnumden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		//checkCudaErrors(cudaMalloc((void**) &(_u_p[dev]), sizeof(real) * dom[dev].Gfx.s3b));
+		//(cudaMalloc((void**) &(_u_p[dev]), sizeof(real) * dom[dev].Gfx.s3b));
 		//gpumem += dom[dev].Gfx.s3b * sizeof(real);
-		//checkCudaErrors(cudaMalloc((void**) &(_v_p[dev]), sizeof(real) * dom[dev].Gfy.s3b));
+		//(cudaMalloc((void**) &(_v_p[dev]), sizeof(real) * dom[dev].Gfy.s3b));
 		//gpumem += dom[dev].Gfy.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_w_b[dev]), sizeof(real) * dom[dev].Gfz.s3b));
+		(cudaMalloc((void**) &(_w_b[dev]), sizeof(real) * dom[dev].Gfz.s3b));
 		gpumem += dom[dev].Gfz.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_ter_cell[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_ter_cell[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		//checkCudaErrors(cudaMalloc((void**) &(_f_x_coupling_numden[dev]), sizeof(real) * dom[dev].Gfx.s3b));
+		//(cudaMalloc((void**) &(_f_x_coupling_numden[dev]), sizeof(real) * dom[dev].Gfx.s3b));
 		//gpumem += dom[dev].Gfx.s3b * sizeof(real);
-		//checkCudaErrors(cudaMalloc((void**) &(_f_y_coupling_numden[dev]), sizeof(real) * dom[dev].Gfy.s3b));
+		//(cudaMalloc((void**) &(_f_y_coupling_numden[dev]), sizeof(real) * dom[dev].Gfy.s3b));
 		//gpumem += dom[dev].Gfy.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_f_z_coupling_numden[dev]), sizeof(real) * dom[dev].Gfz.s3b));
+		(cudaMalloc((void**) &(_f_z_coupling_numden[dev]), sizeof(real) * dom[dev].Gfz.s3b));
 		gpumem += dom[dev].Gfz.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_numGau[dev]), sizeof(real) * dom[dev].Gfz.s2b));
+		/*
+		(cudaMalloc((void**) &(_numGau[dev]), sizeof(real) * dom[dev].Gfz.s2b));
 		gpumem += dom[dev].Gfz.s2b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_masGau[dev]), sizeof(real) * dom[dev].Gfz.s2b));
+		(cudaMalloc((void**) &(_masGau[dev]), sizeof(real) * dom[dev].Gfz.s2b));
 		gpumem += dom[dev].Gfz.s2b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_numGau_temp[dev]), sizeof(real) * dom[dev].Gfz.s2b));
+		(cudaMalloc((void**) &(_numGau_temp[dev]), sizeof(real) * dom[dev].Gfz.s2b));
 		gpumem += dom[dev].Gfz.s2b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_masGau_temp[dev]), sizeof(real) * dom[dev].Gfz.s2b));
+		(cudaMalloc((void**) &(_masGau_temp[dev]), sizeof(real) * dom[dev].Gfz.s2b));
 		gpumem += dom[dev].Gfz.s2b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_BGndot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		*/
+		(cudaMalloc((void**) &(_BGndot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_BGmdot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_BGmdot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		
 		// bubble mass
-		checkCudaErrors(cudaMalloc((void**) &(_bubmas[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_bubmas[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_nextbubmas[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_nextbubmas[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_bubdia[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_bubdia[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_bubdiafz[dev]), sizeof(real) * dom[dev].Gfz.s3b));
+		(cudaMalloc((void**) &(_bubdiafz[dev]), sizeof(real) * dom[dev].Gfz.s3b));
 		gpumem += dom[dev].Gfz.s3b * sizeof(real);
 		
 		// concentration
-		checkCudaErrors(cudaMalloc((void**) &(_concen[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_concen[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		// _nextconcen is to store _concen in next time step, only exist on deivce.
-		checkCudaErrors(cudaMalloc((void**) &(_nextconcen[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_nextconcen[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		// _velmag is to store the velocity magnitude of the fluid flow,
 		// which is used in the source term of mass transfer, only exist on device.
-		checkCudaErrors(cudaMalloc((void**) &(_velmag[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_velmag[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_mdot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_mdot[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_bubden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_bubden[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
-		checkCudaErrors(cudaMalloc((void**) &(_concen_sat[dev]), sizeof(real) * dom[dev].Gcc.s3b));
+		(cudaMalloc((void**) &(_concen_sat[dev]), sizeof(real) * dom[dev].Gcc.s3b));
 		gpumem += dom[dev].Gcc.s3b * sizeof(real);
 		
 		if(gravity_direction == GRAVITY_X) {
-			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfx.s3b));
+			(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfx.s3b));
 			gpumem += dom[dev].Gfx.s3b * sizeof(real);
 		} else if(gravity_direction == GRAVITY_Y) {
-			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfy.s3b));
+			(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfy.s3b));
 			gpumem += dom[dev].Gfy.s3b * sizeof(real);
 		} else if(gravity_direction == GRAVITY_Z) {
-			checkCudaErrors(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfz.s3b));
+			(cudaMalloc((void**) &(_bubden_face[dev]), sizeof(real) * dom[dev].Gfz.s3b));
 			gpumem += dom[dev].Gfz.s3b * sizeof(real);
 		}
 	}
@@ -920,7 +866,7 @@ void cuda_concentration_BC(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
@@ -1072,7 +1018,7 @@ void cuda_concentration_BC(void)
 					BC_p_B_N<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-					BC_p_B_D<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev], concenBC.nBD);
+					//BC_p_B_D<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev], concenBC.nBD);
 					break;
 			}
 		}
@@ -1103,7 +1049,7 @@ void cuda_concentration_BC(void)
 					BC_p_T_N<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-					BC_p_T_D<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev], concenBC.nTD);
+					//BC_p_T_D<<<numBlocks_n, dimBlocks_n>>>(_concen[dev], _dom[dev], concenBC.nTD);
 					break;
 			}
 		}
@@ -1118,7 +1064,7 @@ void cuda_compute_coupling_force(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 
 		int threads_x = 0;
 		int threads_y = 0;
@@ -1184,15 +1130,29 @@ void cuda_compute_coupling_force(void)
 		forcing_reset_z<<<numBlocks_z, dimBlocks_z>>>(_f_z[dev], _dom[dev]);
 		
 		// now add in the forcing
-		real forcing_scale = 1.0 / 6.0 * PI * grav_acc / rho_f;
-		
-		kernel_forcing_add_z_field_bubble<<<numBlocks_z, dimBlocks_z>>>(forcing_scale,
-		                                                                _f_z_coupling_numden[dev],
-		                                                                _bubdiafz[dev],
-		                                                                _f_z[dev],
-		                                                                _dom[dev],
-		                                                                _bubden_face[dev],
-		                                                                rho_f);
+		/*
+		if(quiescent_fluid == OFF) {
+			real forcing_scale = 1.0 / 6.0 * PI * grav_acc / rho_f;
+			kernel_forcing_add_z_field_bubble<<<numBlocks_z, dimBlocks_z>>>(forcing_scale,
+		                                                                    _f_z_coupling_numden[dev],
+		                                                                    _bubdiafz[dev],
+		                                                                    _f_z[dev],
+		                                                                    _dom[dev],
+		                                                                    _bubden_face[dev],
+		                                                                    rho_f);
+		}
+		*/
+		// change the numerical implementation of forceing
+		if(quiescent_fluid == OFF) {
+			real forcing_scale = 1.0 / 6.0 * PI * grav_acc / rho_f;
+			kernel_forcing_add_z_field_bubble<<<numBlocks_z, dimBlocks_z>>>(forcing_scale,
+		                                                                    _numden[dev],
+		                                                                    _bubdia[dev],
+		                                                                    _f_z[dev],
+		                                                                    _dom[dev],
+		                                                                    _bubden[dev],
+		                                                                    rho_f);
+		}
 	}
 }
 
@@ -1202,7 +1162,7 @@ void cuda_concentration_march(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_y = 0;
 		int threads_z = 0;
@@ -1251,7 +1211,7 @@ void cuda_numberdensity_compute_totalnumden(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
@@ -1263,7 +1223,7 @@ void cuda_numberdensity_compute_totalnumden(void)
 		
 		// create temporary storage for reduction algorithms
 		real *_numden_tmp;
-		checkCudaErrors(cudaMalloc((void**) &_numden_tmp, sizeof(real) * N));
+		(cudaMalloc((void**) &_numden_tmp, sizeof(real) * N));
 		gpumem += sizeof(real) * N;
 		
 		// set up kernel call
@@ -1288,10 +1248,12 @@ void cuda_numberdensity_compute_totalnumden(void)
 		                                                       _numden[dev],
 		                                                       _numden_tmp);
 		totalnumden = sum_entries(N, _numden_tmp);
+		totalnumden = totalnumden * Dom.dx * Dom.dy * Dom.dz;
+		printf("Total bubble number(on device) = %f\n\n", totalnumden);
 		
 		// clean up
-		checkCudaErrors(cudaFree(_numden_tmp));
-		}
+		(cudaFree(_numden_tmp));
+	}
 }
 
 extern "C"
@@ -1301,7 +1263,7 @@ void cuda_bubblemass_BC(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
@@ -1438,8 +1400,7 @@ void cuda_bubblemass_BC(void)
 					BC_p_B_P<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-					// NOTE!: because we use upwinding, here we use 0.5*bc
-					//BC_p_B_D_Gaussian<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev], _masGau_temp[dev]);
+					BC_p_B_ghost_D<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
 					break;
 				case NEUMANN:
 					BC_p_B_N<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
@@ -1470,7 +1431,7 @@ void cuda_bubblemass_BC(void)
 					BC_p_T_P<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
 					break;
 				case DIRICHLET:
-					//BC_p_T_D<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev], bubmasBC.nTD);
+					BC_p_T_ghost_D<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
 					break;
 				case NEUMANN:
 					BC_p_T_N<<<numBlocks, dimBlocks>>>(_bubmas[dev], _dom[dev]);
@@ -1490,7 +1451,7 @@ void cuda_coupling_force_preparation(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
@@ -1590,7 +1551,7 @@ void cuda_compute_mdot(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_y = 0;
 		int threads_z = 0;
@@ -1632,7 +1593,7 @@ void cuda_bubblemass_march(void)
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_y = 0;
 		int threads_z = 0;
@@ -1675,54 +1636,349 @@ void cuda_bubblemass_march(void)
 }
 
 extern "C"
-void cuda_num_mas_BC_compute(void)
+real cuda_Eulerian_find_dt(void)
+{
+  // results from all devices
+  real *dts0 = (real*) malloc(nsubdom * sizeof(real));
+    // cpumem += nsubdom * sizeof(real);
+  real *dts1 = (real*) malloc(nsubdom * sizeof(real));
+
+  // parallelize over CPU threads
+  #pragma omp parallel num_threads(nsubdom)
+  {
+    int dev = omp_get_thread_num();
+    (cudaSetDevice(dev + dev_start));
+
+    // search
+    real u_max = find_max_mag(dom[dev].Gfx.s3b, _u[dev]);
+    real v_max = find_max_mag(dom[dev].Gfy.s3b, _v[dev]);
+    real w_max = find_max_mag(dom[dev].Gfz.s3b, _w[dev]);
+    real wp_max = find_max_mag(dom[dev].Gfz.s3b, _w_b[dev]);
+    
+    dts0[dev] = (u_max + 2. * nu / dom[dev].dx) / dom[dev].dx;
+    dts0[dev] += (v_max + 2. * nu / dom[dev].dy) / dom[dev].dy;
+    dts0[dev] += (w_max + 2. * nu / dom[dev].dz) / dom[dev].dz;
+    //dts0[dev] += u_max * u_max / (2.0 * nu);
+    //dts0[dev] += v_max * v_max / (2.0 * nu);
+    //dts0[dev] += w_max * w_max / (2.0 * nu);
+    dts0[dev] = CFL / dts0[dev];
+    
+    dts1[dev] = (u_max + 2. * concen_diff / dom[dev].dx) / dom[dev].dx;
+    dts1[dev] += (v_max + 2. * concen_diff / dom[dev].dy) / dom[dev].dy;
+    dts1[dev] += (wp_max + 2. * concen_diff / dom[dev].dz) / dom[dev].dz;
+    
+    //dts1[dev] += u_max * u_max / (2.0 * concen_diff);
+    //dts1[dev] += v_max * v_max / (2.0 * concen_diff);
+    //dts1[dev] += wp_max * wp_max / (2.0 * concen_diff);
+    dts1[dev] = CFL / dts1[dev];
+    
+    if(dts1[dev] < dts0[dev]) dts0[dev] = dts1[dev];
+  }
+
+  // find min of all devices
+  real min = FLT_MAX;
+  for(int i = 0; i < nsubdom; i++)
+    if(dts0[i] < min) min = dts0[i];
+
+  // clean up
+  free(dts0);
+  free(dts1);
+
+  return min;
+}
+
+extern "C"
+void cuda_Eulerian_compute_forcing(real *pid_int, real *pid_back, real Kp, real Ki,
+  real Kd)
+{
+  // parallelize over CPU threads
+  #pragma omp parallel num_threads(nsubdom)
+  {
+    int dev = omp_get_thread_num();
+    (cudaSetDevice(dev + dev_start));
+
+    int threads_x = 0;
+    int threads_y = 0;
+    int threads_z = 0;
+    int blocks_x = 0;
+    int blocks_y = 0;
+    int blocks_z = 0;
+
+    // x-component
+    if(dom[dev].Gfx._jnb < MAX_THREADS_DIM)
+      threads_y = dom[dev].Gfx._jnb;
+    else
+      threads_y = MAX_THREADS_DIM;
+
+    if(dom[dev].Gfx._knb < MAX_THREADS_DIM)
+      threads_z = dom[dev].Gfx._knb;
+    else
+      threads_z = MAX_THREADS_DIM;
+
+    blocks_y = (int)ceil((real) dom[dev].Gfx._jnb / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gfx._knb / (real) threads_z);
+
+    dim3 dimBlocks_x(threads_y, threads_z);
+    dim3 numBlocks_x(blocks_y, blocks_z);
+
+    // y-component
+    if(dom[dev].Gfy._knb < MAX_THREADS_DIM)
+      threads_z = dom[dev].Gfy._knb;
+    else
+      threads_z = MAX_THREADS_DIM;
+
+    if(dom[dev].Gfy._inb < MAX_THREADS_DIM)
+      threads_x = dom[dev].Gfy._inb;
+    else
+      threads_x = MAX_THREADS_DIM;
+
+    blocks_z = (int)ceil((real) dom[dev].Gfy._knb / (real) threads_z);
+    blocks_x = (int)ceil((real) dom[dev].Gfy._inb / (real) threads_x);
+
+    dim3 dimBlocks_y(threads_z, threads_x);
+    dim3 numBlocks_y(blocks_z, blocks_x);
+
+    // z-component
+    if(dom[dev].Gfz._inb < MAX_THREADS_DIM)
+      threads_x = dom[dev].Gfz._inb;
+    else
+      threads_x = MAX_THREADS_DIM;
+
+    if(dom[dev].Gfz._jnb < MAX_THREADS_DIM)
+      threads_y = dom[dev].Gfz._jnb;
+    else
+      threads_y = MAX_THREADS_DIM;
+
+    blocks_x = (int)ceil((real) dom[dev].Gfz._inb / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gfz._jnb / (real) threads_y);
+
+    dim3 dimBlocks_z(threads_x, threads_y);
+    dim3 numBlocks_z(blocks_x, blocks_y);
+
+    //##########################################################################
+    // reset forcing arrays
+    //forcing_reset_x<<<numBlocks_x, dimBlocks_x>>>(_f_x[dev], _dom[dev]);
+    //forcing_reset_y<<<numBlocks_y, dimBlocks_y>>>(_f_y[dev], _dom[dev]);
+    //forcing_reset_z<<<numBlocks_z, dimBlocks_z>>>(_f_z[dev], _dom[dev]);
+    //##########################################################################
+
+    // linearly accelerate pressure gradient from zero
+    real delta = ttime - p_tDelay;
+    if (delta >= 0 ) {
+      if(gradP.xa == 0) gradP.x = gradP.xm;
+      else if(fabs(delta*gradP.xa) > fabs(gradP.xm)) gradP.x = gradP.xm;
+      else gradP.x = delta*gradP.xa;
+
+      if(gradP.ya == 0) gradP.y = gradP.ym;
+      else if(fabs(delta*gradP.ya) > fabs(gradP.ym)) gradP.y = gradP.ym;
+      else gradP.y = delta*gradP.ya;
+
+      // turn off if PID controller is being used
+      if(!(Kp > 0 || Ki > 0 || Kd > 0)) {
+        if(gradP.za == 0) gradP.z = gradP.zm;
+        else if(fabs(delta*gradP.za) > fabs(gradP.zm)) gradP.z = gradP.zm;
+        else gradP.z = delta*gradP.za;
+      }
+    }
+
+    // linearly accelerate gravitational acceleration from zero
+    delta = ttime - g_tDelay;
+    if (delta >= 0) {
+      if(g.xa == 0) g.x = g.xm;
+      else if(fabs(delta*g.xa) > fabs(g.xm)) g.x = g.xm;
+      else g.x = delta*g.xa;
+
+      if(g.ya == 0) g.y = g.ym;
+      else if(fabs(delta*g.ya) > fabs(g.ym)) g.y = g.ym;
+      else g.y = delta*g.ya;
+
+      if(g.za == 0) g.z = g.zm;
+      else if(fabs(delta*g.za) > fabs(g.zm)) g.z = g.zm;
+      else g.z = delta*g.za;
+    }
+
+    delta = ttime - p_tDelay;
+    // PID controller  TODO: make this into a kernel function
+    if (delta >= 0) {
+      if(Kp > 0 || Ki > 0 || Kd > 0) {
+        cuda_part_pull();
+        real acc_z = 0;
+        real volp = 0;
+        real massp = 0;
+        for(int i = 0; i < nparts; i++) {
+          volp += parts[i].r*parts[i].r*parts[i].r;
+          massp += parts[i].rho*parts[i].r*parts[i].r*parts[i].r;
+          acc_z += parts[i].wdot;
+        }
+        volp *= 4./3.*PI;
+        massp *= 4./3.*PI;
+        real volfrac = volp / (Dom.xl * Dom.yl * Dom.zl);
+        real rho_avg = massp/volp*volfrac + rho_f*(1.-volfrac);
+        acc_z /= nparts;
+
+        *pid_int = *pid_int + acc_z*dt;
+        gradP.z = gradP.z
+          + (Kp*acc_z + Ki*(*pid_int)/ttime + (Kd)*(acc_z-*pid_back))*rho_avg;
+        *pid_back = acc_z;
+      }
+    }
+    forcing_add_x_const<<<numBlocks_x, dimBlocks_x>>>(-gradP.x / rho_f,
+      _f_x[dev], _dom[dev]);
+    forcing_add_y_const<<<numBlocks_y, dimBlocks_y>>>(-gradP.y / rho_f,
+      _f_y[dev], _dom[dev]);
+    forcing_add_z_const<<<numBlocks_z, dimBlocks_z>>>(-gradP.z / rho_f,
+      _f_z[dev], _dom[dev]);
+
+  }
+}
+
+extern "C"
+void cuda_botbubbvel_BC(void)
 {
 	// CPU threading for multi-GPU
 	#pragma omp parallel num_threads(nsubdom)
 	{
 		int dev = omp_get_thread_num();
-		checkCudaErrors(cudaSetDevice(dev + dev_start));
+		(cudaSetDevice(dev + dev_start));
 		
 		int threads_x = 0;
 		int threads_y = 0;
 		int blocks_x = 0;
 		int blocks_y = 0;
 		
-		// set up kernel call: Gfz-z-ghost
-		if(dom[dev].Gfz._inb < MAX_THREADS_DIM)
-			threads_x = dom[dev].Gfz._inb;
-		else
-			threads_x = MAX_THREADS_DIM;
+		// check whether bottom boundary is an external boundary
+		if(dom[dev].B == -1) {
+			// set up kernel call
+			if(dom[dev].Gfz.inb < MAX_THREADS_DIM)
+				threads_x = dom[dev].Gfz.inb;
+			else
+				threads_x = MAX_THREADS_DIM;
+			
+			if(dom[dev].Gfz.jnb < MAX_THREADS_DIM)
+				threads_y = dom[dev].Gfz.jnb;
+			else
+				threads_y = MAX_THREADS_DIM;
+			
+			blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
+			blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
+			
+			dim3 dimBlocks_w(threads_x, threads_y);
+			dim3 numBlocks_w(blocks_x, blocks_y);
+			
+			// apply zero-Dirichlet BC to bubble velocity for this face
+			BC_w_B_D<<<numBlocks_w, dimBlocks_w>>>(_w_b[dev], _dom[dev], 0.);
+		}
+	}
+}
 
-		if(dom[dev].Gfz._jnb < MAX_THREADS_DIM)
-			threads_y = dom[dev].Gfz._jnb;
-		else
-			threads_y = MAX_THREADS_DIM;
-
-		blocks_x = (int)ceil((real) dom[dev].Gfz._inb / (real) threads_x);
-		blocks_y = (int)ceil((real) dom[dev].Gfz._jnb / (real) threads_y);
-
-		dim3 dimBlocks(threads_x, threads_y);
-		dim3 numBlocks(blocks_x, blocks_y);
+extern "C"
+void cuda_compute_HYPERBOLICTANRANDOM(void)
+{
+	#pragma omp parallel num_threads(nsubdom)
+	{
+		int dev = omp_get_thread_num();
+		(cudaSetDevice(dev + dev_start));
 		
-		real scale1 = 1.0;
-		if(ttime < numdenBC.nBDt && numdenBC.nBDt > 0) {
-			scale1 = ttime / numdenBC.nBDt;
+		const int bubble_number_this_step = lrint(dt * BubbleGenerator.BubGen_bubblenumber);
+		int C, i, j, k;
+		int *keys;
+		int *keys_out;
+		int *values;
+		int *values_out;
+		
+		// allocate memory on host or device
+		bub_gen_pos = (bubble_struct*) malloc(bubble_number_this_step * sizeof(bubble_struct));
+		keys     = (int*) malloc(bubble_number_this_step * sizeof(int));
+		keys_out = (int*) malloc(bubble_number_this_step * sizeof(int));
+		values     = (int*) malloc(bubble_number_this_step * sizeof(int));
+		values_out = (int*) malloc(bubble_number_this_step * sizeof(int));
+		
+		//_bub_gen_pos = (bubble_struct**) malloc(nsubdom * sizeof(bubble_struct*));
+		for(i = 0; i < bubble_number_this_step; i++) {
+			keys[i] = 0;
+			keys_out[i] = 0;
+			values[i] = 1;
+			values_out[i] = 1;
 		}
 		
-		kernel_compute_bubble_generator<<<numBlocks, dimBlocks>>>(_dom[dev],
-		                                                          _numGau_temp[dev],
-		                                                          _numGau[dev],
-		                                                          scale1);
-		
-		real scale2 = 1.0;
-		if(ttime < bubmasBC.nBDt && bubmasBC.nBDt > 0) {
-			scale2 = ttime / bubmasBC.nBDt;
+		for(C = 0; C < bubble_number_this_step; C++) {
+			
+			real temp_x = (real)rand()/(real)(RAND_MAX);
+			real temp_y = (real)rand()/(real)(RAND_MAX);
+			real temp_z = (real)rand()/(real)(RAND_MAX);
+			
+			for(i = 0; i < Dom.xn && temp_x > Ix[i]; i++);
+			if(i > 0) {
+				float x1 = Dom.xs + Dom.dx * (i - 0.5);
+				float x2 = x1 + Dom.dx;
+				bub_gen_pos[C].x = (temp_x - Ix[i-1]) / (Ix[i] - Ix[i-1]) * x2 + (Ix[i] - temp_x) / (Ix[i] - Ix[i-1]) * x1;
+			} else {
+				float x1 = Dom.xs;
+				float x2 = Dom.xs + Dom.dx * 0.5;
+				bub_gen_pos[C].x = (temp_x - 0.) / Ix[0] * x2 + (Ix[0] - temp_x) / Ix[0] * x1;
+			}
+			
+			for(j = 0; j < Dom.yn && temp_y > Iy[j]; j++);
+			if(j > 0) {
+				float y1 = Dom.ys + Dom.dy * (j - 0.5);
+				float y2 = y1 + Dom.dy;
+				bub_gen_pos[C].y = (temp_y - Iy[j-1]) / (Iy[j] - Iy[j-1]) * y2 + (Iy[j] - temp_y) / (Iy[j] - Iy[j-1]) * y1;
+			} else {
+				float y1 = Dom.ys;
+				float y2 = Dom.ys + Dom.dy * 0.5;
+				bub_gen_pos[C].y = (temp_y - 0.) / Iy[0] * y2 + (Iy[0] - temp_y) / Iy[0] * y1;
+			}
+			
+			for(k = 0; k < Dom.zn && temp_z > Iz[k]; k++);
+			if(k > 0) {
+				float z1 = Dom.zs + Dom.dz * (k - 0.5);
+				float z2 = z1 + Dom.dz;
+				bub_gen_pos[C].z = (temp_z - Iz[k-1]) / (Iz[k] - Iz[k-1]) * z2 + (Iz[k] - temp_z) / (Iz[k] - Iz[k-1]) * z1;
+			} else {
+				float z1 = Dom.zs;
+				float z2 = Dom.zs + Dom.dz * 0.5;
+				bub_gen_pos[C].z = (temp_z - 0.) / Iz[0] * z2 + (Iz[0] - temp_z) / Iz[0] * z1;
+			}
 		}
 		
-		kernel_compute_bubble_generator<<<numBlocks, dimBlocks>>>(_dom[dev],
-		                                                          _masGau_temp[dev],
-		                                                          _masGau[dev],
-		                                                          scale2);
+		// calculate keys
+		for(C = 0; C < bubble_number_this_step; C++) {
+			i = (int)ceil(((bub_gen_pos[C].x - Dom.xs) / Dom.dx));
+			j = (int)ceil(((bub_gen_pos[C].y - Dom.ys) / Dom.dy));
+			k = (int)ceil(((bub_gen_pos[C].z - Dom.zs) / Dom.dz));
+			keys[C] = i + j * Dom.Gcc.s1b + k * Dom.Gcc.s2b;
+			//printf("number = %d, i = %d, j = %d, k = %d, key = %d, value = %d\n", bubble_number_this_step, i, j, k, keys[C], values[C]);
+		}
+		
+		// sort
+		thrust::sort(keys, keys + bubble_number_this_step);
+		
+		// reduce by key
+		thrust::reduce_by_key(keys, keys + bubble_number_this_step, values, keys_out, values_out);
+		
+		// reset bubble injection rate
+		for(C = 0; C < Dom.Gcc.s3b; C++) {
+			BGndot[C] = 0.0;
+			BGmdot[C] = 0.0;
+		}
+		
+		// calculate
+		for(C = 0; C < bubble_number_this_step; C++) {
+			if(keys_out[C] > 0) {
+				BGndot[keys_out[C]] = values_out[C] / (Dom.dx * Dom.dy * Dom.dz) / dt;
+				BGmdot[keys_out[C]] = PI / 6. * pow(BubbleGenerator.BubGen_dia, 3.0) * bubden[keys_out[C]] * BGndot[keys_out[C]];
+				//printf("position: %d, ndot: %f, mdot: %f\n", keys_out[C], BGndot[keys_out[C]], BGmdot[keys_out[C]]);
+			}
+		}
+		
+		// push memory
+		(cudaMemcpy(_BGndot[dev], BGndot, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		(cudaMemcpy(_BGmdot[dev], BGmdot, sizeof(real) * dom[dev].Gcc.s3b, cudaMemcpyHostToDevice));
+		
+		// free memory
+		free(keys);
+		free(values);
+		free(keys_out);
+		free(values_out);
 	}
 }

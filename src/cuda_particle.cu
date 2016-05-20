@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@
 #include "cuda_particle.h"
 
 #include <cuda.h>
-#include <helper_cuda.h>
 
 extern "C"
 void cuda_part_malloc(void)
@@ -83,84 +82,87 @@ void cuda_part_malloc(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
-    checkCudaErrors(cudaMalloc((void**) &(_parts[dev]),
+    (cudaMalloc((void**) &(_parts[dev]),
       sizeof(part_struct) * nparts));
     gpumem += sizeof(part_struct) * nparts;
 
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_re[dev]),
+    (cudaMalloc((void**) &(_pnm_re[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_im[dev]),
+    (cudaMalloc((void**) &(_pnm_im[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_re[dev]),
+    (cudaMalloc((void**) &(_phinm_re[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_im[dev]),
+    (cudaMalloc((void**) &(_phinm_im[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_re[dev]),
+    (cudaMalloc((void**) &(_chinm_re[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_im[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_re0[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_im0[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_re0[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_im0[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_re0[dev]),
-      sizeof(real) * coeff_stride * nparts));
-    gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_im0[dev]),
+    (cudaMalloc((void**) &(_chinm_im[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
 
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_re00[dev]),
+    (cudaMalloc((void**) &(_pnm_re0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_pnm_im00[dev]),
+    (cudaMalloc((void**) &(_pnm_im0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_re00[dev]),
+    (cudaMalloc((void**) &(_phinm_re0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_phinm_im00[dev]),
+    (cudaMalloc((void**) &(_phinm_im0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_re00[dev]),
+    (cudaMalloc((void**) &(_chinm_re0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
-    checkCudaErrors(cudaMalloc((void**) &(_chinm_im00[dev]),
+    (cudaMalloc((void**) &(_chinm_im0[dev]),
       sizeof(real) * coeff_stride * nparts));
     gpumem += sizeof(real) * coeff_stride * nparts;
 
-    checkCudaErrors(cudaMalloc((void**) &(_phase[dev]),
+    (cudaMalloc((void**) &(_pnm_re00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+    (cudaMalloc((void**) &(_pnm_im00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+    (cudaMalloc((void**) &(_phinm_re00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+    (cudaMalloc((void**) &(_phinm_im00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+    (cudaMalloc((void**) &(_chinm_re00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+    (cudaMalloc((void**) &(_chinm_im00[dev]),
+      sizeof(real) * coeff_stride * nparts));
+    gpumem += sizeof(real) * coeff_stride * nparts;
+
+    (cudaMalloc((void**) &(_phase[dev]),
       sizeof(int) * dom[dev].Gcc.s3b));
     gpumem += sizeof(int) * dom[dev].Gcc.s3b;
-    checkCudaErrors(cudaMalloc((void**) &(_phase_shell[dev]),
+    (cudaMalloc((void**) &(_phase_shell[dev]),
       sizeof(int) * dom[dev].Gcc.s3b));
     gpumem += sizeof(int) * dom[dev].Gcc.s3b;
-    checkCudaErrors(cudaMalloc((void**) &(_flag_u[dev]),
+    (cudaMalloc((void**) &(_flag_u[dev]),
       sizeof(int) * dom[dev].Gfx.s3b));
     gpumem += sizeof(int) * dom[dev].Gfx.s3b;
-    checkCudaErrors(cudaMalloc((void**) &(_flag_v[dev]),
+    (cudaMalloc((void**) &(_flag_v[dev]),
       sizeof(int) * dom[dev].Gfy.s3b));
     gpumem += sizeof(int) * dom[dev].Gfy.s3b;
-    checkCudaErrors(cudaMalloc((void**) &(_flag_w[dev]),
+    (cudaMalloc((void**) &(_flag_w[dev]),
       sizeof(int) * dom[dev].Gfz.s3b));
     gpumem += sizeof(int) * dom[dev].Gfz.s3b;
+
+    (cudaMalloc((void**) &(_binDom), sizeof(dom_struct)));
+    gpumem += sizeof(dom_struct);
   }
 }
 
@@ -171,56 +173,59 @@ void cuda_part_push(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
-    checkCudaErrors(cudaMemcpy(_parts[dev], parts, sizeof(part_struct) * nparts,
+    (cudaMemcpy(_parts[dev], parts, sizeof(part_struct) * nparts,
       cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_re[dev], pnm_re, sizeof(real) * coeff_stride
+    (cudaMemcpy(_pnm_re[dev], pnm_re, sizeof(real) * coeff_stride
       * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_im[dev], pnm_im, sizeof(real) * coeff_stride
+    (cudaMemcpy(_pnm_im[dev], pnm_im, sizeof(real) * coeff_stride
       * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_re[dev], phinm_re, sizeof(real)
+    (cudaMemcpy(_phinm_re[dev], phinm_re, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_im[dev], phinm_im, sizeof(real)
+    (cudaMemcpy(_phinm_im[dev], phinm_im, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_re[dev], chinm_re, sizeof(real)
+    (cudaMemcpy(_chinm_re[dev], chinm_re, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_im[dev], chinm_im, sizeof(real)
+    (cudaMemcpy(_chinm_im[dev], chinm_im, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_re0[dev], pnm_re0, sizeof(real)
+    (cudaMemcpy(_pnm_re0[dev], pnm_re0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_im0[dev], pnm_im0, sizeof(real)
+    (cudaMemcpy(_pnm_im0[dev], pnm_im0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_re0[dev], phinm_re0, sizeof(real)
+    (cudaMemcpy(_phinm_re0[dev], phinm_re0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_im0[dev], phinm_im0, sizeof(real)
+    (cudaMemcpy(_phinm_im0[dev], phinm_im0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_re0[dev], chinm_re0, sizeof(real)
+    (cudaMemcpy(_chinm_re0[dev], chinm_re0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_im0[dev], chinm_im0, sizeof(real)
+    (cudaMemcpy(_chinm_im0[dev], chinm_im0, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_re00[dev], pnm_re00, sizeof(real)
+    (cudaMemcpy(_pnm_re00[dev], pnm_re00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_im00[dev], pnm_im00, sizeof(real)
+    (cudaMemcpy(_pnm_im00[dev], pnm_im00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_re00[dev], phinm_re00, sizeof(real)
+    (cudaMemcpy(_phinm_re00[dev], phinm_re00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_im00[dev], phinm_im00, sizeof(real)
+    (cudaMemcpy(_phinm_im00[dev], phinm_im00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_re00[dev], chinm_re00, sizeof(real)
+    (cudaMemcpy(_chinm_re00[dev], chinm_re00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_im00[dev], chinm_im00, sizeof(real)
+    (cudaMemcpy(_chinm_im00[dev], chinm_im00, sizeof(real)
       * coeff_stride * nparts, cudaMemcpyHostToDevice));
 
-    checkCudaErrors(cudaMemcpy(_phase[0], phase, sizeof(int) * dom[0].Gcc.s3b,
+    (cudaMemcpy(_phase[0], phase, sizeof(int) * dom[0].Gcc.s3b,
       cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_phase_shell[0], phase_shell,
+    (cudaMemcpy(_phase_shell[0], phase_shell,
       sizeof(int) * dom[0].Gcc.s3b, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_flag_u[0], flag_u, sizeof(int) * dom[0].Gfx.s3b,
+    (cudaMemcpy(_flag_u[0], flag_u, sizeof(int) * dom[0].Gfx.s3b,
       cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_flag_v[0], flag_v, sizeof(int) * dom[0].Gfy.s3b,
+    (cudaMemcpy(_flag_v[0], flag_v, sizeof(int) * dom[0].Gfy.s3b,
       cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(_flag_w[0], flag_w, sizeof(int) * dom[0].Gfz.s3b,
+    (cudaMemcpy(_flag_w[0], flag_w, sizeof(int) * dom[0].Gfz.s3b,
+      cudaMemcpyHostToDevice));
+
+    (cudaMemcpy(_binDom, &binDom, sizeof(dom_struct),
       cudaMemcpyHostToDevice));
   }
 }
@@ -229,59 +234,59 @@ extern "C"
 void cuda_part_pull(void)
 {
   // all devices have the same particle data for now, so just copy one of them
-  checkCudaErrors(cudaMemcpy(parts, _parts[0], sizeof(part_struct) * nparts,
+  (cudaMemcpy(parts, _parts[0], sizeof(part_struct) * nparts,
     cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_re, _pnm_re[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_re, _pnm_re[0], sizeof(real) * coeff_stride
     * nparts,cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_im, _pnm_im[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_im, _pnm_im[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_re, _phinm_re[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_re, _phinm_re[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_im, _phinm_im[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_im, _phinm_im[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_re, _chinm_re[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_re, _chinm_re[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_im, _chinm_im[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_im, _chinm_im[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_re0, _pnm_re0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_re0, _pnm_re0[0], sizeof(real) * coeff_stride
     * nparts,cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_im0, _pnm_im0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_im0, _pnm_im0[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_re0, _phinm_re0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_re0, _phinm_re0[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_im0, _phinm_im0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_im0, _phinm_im0[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_re0, _chinm_re0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_re0, _chinm_re0[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_im0, _chinm_im0[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_im0, _chinm_im0[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_re00, _pnm_re00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_re00, _pnm_re00[0], sizeof(real) * coeff_stride
     * nparts,cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(pnm_im00, _pnm_im00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(pnm_im00, _pnm_im00[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_re00, _phinm_re00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_re00, _phinm_re00[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phinm_im00, _phinm_im00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(phinm_im00, _phinm_im00[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_re00, _chinm_re00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_re00, _chinm_re00[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(chinm_im00, _chinm_im00[0], sizeof(real) * coeff_stride
+  (cudaMemcpy(chinm_im00, _chinm_im00[0], sizeof(real) * coeff_stride
     * nparts, cudaMemcpyDeviceToHost));
 
   // copy for device cage setup testing
-  checkCudaErrors(cudaMemcpy(phase, _phase[0], sizeof(int) * dom[0].Gcc.s3b,
+  (cudaMemcpy(phase, _phase[0], sizeof(int) * dom[0].Gcc.s3b,
     cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(phase_shell, _phase_shell[0], sizeof(int) * dom[0].Gcc.s3b,
+  (cudaMemcpy(phase_shell, _phase_shell[0], sizeof(int) * dom[0].Gcc.s3b,
     cudaMemcpyDeviceToHost));
 
 #ifdef DEBUG
-  checkCudaErrors(cudaMemcpy(phase_shell, _phase_shell[0],
+  (cudaMemcpy(phase_shell, _phase_shell[0],
     sizeof(int) * dom[0].Gcc.s3b, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(flag_u, _flag_u[0], sizeof(int) * dom[0].Gfx.s3b,
+  (cudaMemcpy(flag_u, _flag_u[0], sizeof(int) * dom[0].Gfx.s3b,
     cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(flag_v, _flag_v[0], sizeof(int) * dom[0].Gfy.s3b,
+  (cudaMemcpy(flag_v, _flag_v[0], sizeof(int) * dom[0].Gfy.s3b,
     cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(flag_w, _flag_w[0], sizeof(int) * dom[0].Gfz.s3b,
+  (cudaMemcpy(flag_w, _flag_w[0], sizeof(int) * dom[0].Gfz.s3b,
     cudaMemcpyDeviceToHost));
 #endif
 }
@@ -293,33 +298,34 @@ void cuda_part_free(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
-    checkCudaErrors(cudaFree(_parts[dev]));
-    checkCudaErrors(cudaFree(_pnm_re[dev]));
-    checkCudaErrors(cudaFree(_pnm_im[dev]));
-    checkCudaErrors(cudaFree(_phinm_re[dev]));
-    checkCudaErrors(cudaFree(_phinm_im[dev]));
-    checkCudaErrors(cudaFree(_chinm_re[dev]));
-    checkCudaErrors(cudaFree(_chinm_im[dev]));
-    checkCudaErrors(cudaFree(_pnm_re0[dev]));
-    checkCudaErrors(cudaFree(_pnm_im0[dev]));
-    checkCudaErrors(cudaFree(_phinm_re0[dev]));
-    checkCudaErrors(cudaFree(_phinm_im0[dev]));
-    checkCudaErrors(cudaFree(_chinm_re0[dev]));
-    checkCudaErrors(cudaFree(_chinm_im0[dev]));
-    checkCudaErrors(cudaFree(_pnm_re00[dev]));
-    checkCudaErrors(cudaFree(_pnm_im00[dev]));
-    checkCudaErrors(cudaFree(_phinm_re00[dev]));
-    checkCudaErrors(cudaFree(_phinm_im00[dev]));
-    checkCudaErrors(cudaFree(_chinm_re00[dev]));
-    checkCudaErrors(cudaFree(_chinm_im00[dev]));
-    checkCudaErrors(cudaFree(_phase[dev]));
-    checkCudaErrors(cudaFree(_phase_shell[dev]));
-    checkCudaErrors(cudaFree(_flag_u[dev]));
-    checkCudaErrors(cudaFree(_flag_v[dev]));
-    checkCudaErrors(cudaFree(_flag_w[dev]));
+    (cudaFree(_parts[dev]));
+    (cudaFree(_pnm_re[dev]));
+    (cudaFree(_pnm_im[dev]));
+    (cudaFree(_phinm_re[dev]));
+    (cudaFree(_phinm_im[dev]));
+    (cudaFree(_chinm_re[dev]));
+    (cudaFree(_chinm_im[dev]));
+    (cudaFree(_pnm_re0[dev]));
+    (cudaFree(_pnm_im0[dev]));
+    (cudaFree(_phinm_re0[dev]));
+    (cudaFree(_phinm_im0[dev]));
+    (cudaFree(_chinm_re0[dev]));
+    (cudaFree(_chinm_im0[dev]));
+    (cudaFree(_pnm_re00[dev]));
+    (cudaFree(_pnm_im00[dev]));
+    (cudaFree(_phinm_re00[dev]));
+    (cudaFree(_phinm_im00[dev]));
+    (cudaFree(_chinm_re00[dev]));
+    (cudaFree(_chinm_im00[dev]));
+    (cudaFree(_phase[dev]));
+    (cudaFree(_phase_shell[dev]));
+    (cudaFree(_flag_u[dev]));
+    (cudaFree(_flag_v[dev]));
+    (cudaFree(_flag_w[dev]));
   }
+    (cudaFree(_binDom));
 
   free(_parts);
   free(_pnm_re);
@@ -356,10 +362,10 @@ void cuda_build_cages(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
     int i;    // iterator
-    real Y, Z;  // virtual particle center location
+    real X, Y, Z;  // virtual particle center location
 
     int threads_x = 0;
     int threads_y = 0;
@@ -407,7 +413,7 @@ void cuda_build_cages(void)
     dim3 dimBlocks_u(threads_y, threads_z);
     dim3 numBlocks_u(blocks_y, blocks_z);
 
-    reset_flag_u<<<numBlocks_u, dimBlocks_u>>>(_flag_u[dev], _dom[dev], bc);
+    reset_flag_u<<<numBlocks_u, dimBlocks_u>>>(_flag_u[dev], _dom[dev]);
 
     // reset flag_v
     if(dom[dev].Gfy.kn < MAX_THREADS_DIM)
@@ -426,7 +432,7 @@ void cuda_build_cages(void)
     dim3 dimBlocks_v(threads_z, threads_x);
     dim3 numBlocks_v(blocks_z, blocks_x);
 
-    reset_flag_v<<<numBlocks_v, dimBlocks_v>>>(_flag_v[dev], _dom[dev], bc);
+    reset_flag_v<<<numBlocks_v, dimBlocks_v>>>(_flag_v[dev], _dom[dev]);
 
     // reset flag_w
     if(dom[dev].Gfz.in < MAX_THREADS_DIM)
@@ -445,7 +451,7 @@ void cuda_build_cages(void)
     dim3 dimBlocks_w(threads_x, threads_y);
     dim3 numBlocks_w(blocks_x, blocks_y);
 
-    reset_flag_w<<<numBlocks_w, dimBlocks_w>>>(_flag_w[dev], _dom[dev], bc);
+    reset_flag_w<<<numBlocks_w, dimBlocks_w>>>(_flag_w[dev], _dom[dev]);
 
     // build cages and update phase
     // TODO: do the first half of this on the card
@@ -453,9 +459,9 @@ void cuda_build_cages(void)
     for(i = 0; i < nparts; i++) {
       // set up cage extents
       // add 4 cells to ensure cage is completely contained in the bounding box
-      parts[i].cage.in = (int)(2.0 * ceil(parts[i].r / dom[dev].dx));// + 2;
-      parts[i].cage.jn = (int)(2.0 * ceil(parts[i].r / dom[dev].dy));// + 2;
-      parts[i].cage.kn = (int)(2.0 * ceil(parts[i].r / dom[dev].dz));// + 2;
+      parts[i].cage.in = (int)(2.0 * ceil(parts[i].r / dom[dev].dx)) + 2;
+      parts[i].cage.jn = (int)(2.0 * ceil(parts[i].r / dom[dev].dy)) + 2;
+      parts[i].cage.kn = (int)(2.0 * ceil(parts[i].r / dom[dev].dz)) + 2;
 
       // remove a cell from cage for odd number of cells in domain
       if(dom[dev].xn % 2) {
@@ -477,7 +483,7 @@ void cuda_build_cages(void)
       parts[i].cage.is = (int)(round((parts[i].x-dom->xs)/dom->dx)
         - 0.5 * parts[i].cage.in + DOM_BUF);
       parts[i].cage.ie = parts[i].cage.is + parts[i].cage.in;
-      if(parts[i].cage.is <= dom->Gcc.is) {
+      if(parts[i].cage.is < dom->Gcc.is) {
         parts[i].cage.is = parts[i].cage.is + dom->Gcc.ie;
         parts[i].cage.ibs = dom->Gcc.ie;
         parts[i].cage.ibe = dom->Gcc.is;
@@ -493,7 +499,7 @@ void cuda_build_cages(void)
       parts[i].cage.js = (int)(round((parts[i].y-dom->ys)/dom->dy)
         - 0.5 * parts[i].cage.jn + DOM_BUF);
       parts[i].cage.je = parts[i].cage.js + parts[i].cage.jn;
-      if(parts[i].cage.js <= dom->Gcc.js) {
+      if(parts[i].cage.js < dom->Gcc.js) {
         parts[i].cage.js = parts[i].cage.js + dom->Gcc.je;
         parts[i].cage.jbs = dom->Gcc.je;
         parts[i].cage.jbe = dom->Gcc.js;
@@ -509,7 +515,7 @@ void cuda_build_cages(void)
       parts[i].cage.ks = (int)(round((parts[i].z-dom->zs)/dom->dz)
         - 0.5 * parts[i].cage.kn + DOM_BUF);
       parts[i].cage.ke = parts[i].cage.ks + parts[i].cage.kn;
-      if(parts[i].cage.ks <= dom->Gcc.ks) {
+      if(parts[i].cage.ks < dom->Gcc.ks) {
         parts[i].cage.ks = parts[i].cage.ks + dom->Gcc.ke;
         parts[i].cage.kbs = dom->Gcc.ke;
         parts[i].cage.kbe = dom->Gcc.ks;
@@ -525,937 +531,366 @@ void cuda_build_cages(void)
     }
 
     // push particle information to device
-    checkCudaErrors(cudaMemcpy(_parts[dev], parts, sizeof(part_struct) * nparts,
+    (cudaMemcpy(_parts[dev], parts, sizeof(part_struct) * nparts,
       cudaMemcpyHostToDevice));
 
+    threads_x = MAX_THREADS_DIM/2;
+    threads_y = MAX_THREADS_DIM/2;
+    threads_z = MAX_THREADS_DIM/2;
+
+    int xPer = (bc.uE == PERIODIC);
+    int yPer = (bc.vN == PERIODIC);
+    int zPer = (bc.wT == PERIODIC);
     for(i = 0; i < nparts; i++) {
-      // BS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_c);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_c);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_c);
+      blocks_x = (int)ceil((real)parts[i].cage.in/(real)threads_x);
+      blocks_y = (int)ceil((real)parts[i].cage.jn/(real)threads_y);
+      blocks_z = (int)ceil((real)parts[i].cage.kn/(real)threads_z);
 
-      dim3 dimBlocks_c(threads_c, threads_c);
-      dim3 numBlocks_c(blocks_y, blocks_z);
+      dim3 dimBlocks_3c(threads_x, threads_y, threads_z);
+      dim3 numBlocks_3c(blocks_x, blocks_y, blocks_z);
 
-      if(parts[i].y < (dom[dev].ys + parts[i].r)) Y = parts[i].y + dom[dev].yl;
-      else Y = parts[i].y;
-      if(parts[i].z < (dom[dev].zs + parts[i].r)) Z = parts[i].z + dom[dev].zl;
-      else Z = parts[i].z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        build_cage<<<numBlocks_c, dimBlocks_c>>>(i, _parts[dev],
-          _phase[dev], _phase_shell[dev], _dom[dev],
-          Y, Z,
+      if(blocks_x > 0 && blocks_y > 0 && blocks_z > 0) {
+        // center - is < ibs, js < jbs, ks < kbs
+        X = parts[i].x + (parts[i].x < dom[dev].xs + parts[i].r)*dom[dev].xl*xPer;
+        Y = parts[i].y + (parts[i].y < dom[dev].ys + parts[i].r)*dom[dev].yl*yPer;
+        Z = parts[i].z + (parts[i].z < dom[dev].zs + parts[i].r)*dom[dev].zl*zPer;
+        build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+          _phase[dev], _dom[dev], X, Y, Z,
+          parts[i].cage.is, parts[i].cage.ibs,
           parts[i].cage.js, parts[i].cage.jbs,
           parts[i].cage.ks, parts[i].cage.kbs);
+        // WE split - ibe < ie, js < jbs, ks < kbs
+        if(parts[i].cage.ibe < parts[i].cage.ie) {
+          X = parts[i].x
+            - dom[dev].xl*(parts[i].x > (dom[dev].xe - parts[i].r))*xPer;
+          Y = parts[i].y
+            + dom[dev].yl*(parts[i].y < (dom[dev].ys + parts[i].r))*yPer;
+          Z = parts[i].z
+            + dom[dev].zl*(parts[i].z < (dom[dev].zs + parts[i].r))*zPer;
 
-      // BN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_c);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - (parts[i].cage.jbe))
-        / (real) threads_c);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_c);
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.ibe, parts[i].cage.ie,
+            parts[i].cage.js, parts[i].cage.jbs,
+            parts[i].cage.ks, parts[i].cage.kbs);
+        } 
+        // SN split - is < ibs, jbe < je, ks < kbs
+        if(parts[i].cage.jbe < parts[i].cage.je) {
+          X = parts[i].x
+            + dom[dev].xl*(parts[i].x < (dom[dev].xs + parts[i].r))*xPer;
+          Y = parts[i].y
+            - dom[dev].yl*(parts[i].y > (dom[dev].ye - parts[i].r))*yPer;
+          Z = parts[i].z
+            + dom[dev].zl*(parts[i].z < (dom[dev].zs + parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.is, parts[i].cage.ibs,
+            parts[i].cage.jbe, parts[i].cage.je,
+            parts[i].cage.ks, parts[i].cage.kbs);
+        }
+        // BT split - is < ibs, js < jbs, kbe < ke
+        if(parts[i].cage.kbe < parts[i].cage.ke) {
+          X = parts[i].x
+            + dom[dev].xl*(parts[i].x < (dom[dev].xs + parts[i].r))*xPer;
+          Y = parts[i].y
+            + dom[dev].yl*(parts[i].y < (dom[dev].ys + parts[i].r))*yPer;
+          Z = parts[i].z
+            - dom[dev].zl*(parts[i].z > (dom[dev].ze - parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.is, parts[i].cage.ibs,
+            parts[i].cage.js, parts[i].cage.jbs,
+            parts[i].cage.kbe, parts[i].cage.ke);
+        }
+        // WESN corner - ibe < ie, jbe < je, ks < kbs
+        if(parts[i].cage.ibe < parts[i].cage.ie && 
+            parts[i].cage.jbe < parts[i].cage.je) {
+          X = parts[i].x
+            - dom[dev].xl*(parts[i].x > (dom[dev].xe - parts[i].r))*xPer;
+          Y = parts[i].y
+            - dom[dev].yl*(parts[i].y > (dom[dev].ye - parts[i].r))*yPer;
+          Z = parts[i].z
+            + dom[dev].zl*(parts[i].z < (dom[dev].zs + parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.ibe, parts[i].cage.ie,
+            parts[i].cage.jbe, parts[i].cage.je,
+            parts[i].cage.ks, parts[i].cage.kbs);
+        }
+        // WEBT corner - ibe < ie, js < jbs, kbe < ke
+        if(parts[i].cage.ibe < parts[i].cage.ie && 
+            parts[i].cage.kbe < parts[i].cage.ke) {
+          X = parts[i].x
+            - dom[dev].xl*(parts[i].x > (dom[dev].xe - parts[i].r))*xPer;
+          Y = parts[i].y
+            + dom[dev].yl*(parts[i].y < (dom[dev].ys + parts[i].r))*yPer;
+          Z = parts[i].z
+            - dom[dev].zl*(parts[i].z > (dom[dev].ze - parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.ibe, parts[i].cage.ie,
+            parts[i].cage.js, parts[i].cage.jbs,
+            parts[i].cage.kbe, parts[i].cage.ke);
+        }
+        // SNBT corner - is < ibs, jbe < je, kbe < ke
+        if(parts[i].cage.jbe < parts[i].cage.je && 
+            parts[i].cage.kbe < parts[i].cage.ke) {
+          X = parts[i].x
+            + dom[dev].xl*(parts[i].x < (dom[dev].xs + parts[i].r))*xPer;
+          Y = parts[i].y
+            - dom[dev].yl*(parts[i].y > (dom[dev].ye - parts[i].r))*yPer;
+          Z = parts[i].z
+            - dom[dev].zl*(parts[i].z > (dom[dev].ze - parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.is, parts[i].cage.ibs,
+            parts[i].cage.jbe, parts[i].cage.je,
+            parts[i].cage.kbe, parts[i].cage.ke);
+        }
+        // All corners - ibe < ie, jbe < je, kbe < ke
+        if(parts[i].cage.ibe < parts[i].cage.ie && 
+            parts[i].cage.jbe < parts[i].cage.je && 
+            parts[i].cage.kbe < parts[i].cage.ke) {
+          X = parts[i].x
+            - dom[dev].xl*(parts[i].x > (dom[dev].xe - parts[i].r))*xPer;
+          Y = parts[i].y
+            - dom[dev].yl*(parts[i].y > (dom[dev].ye - parts[i].r))*yPer;
+          Z = parts[i].z
+            - dom[dev].zl*(parts[i].z > (dom[dev].ze - parts[i].r))*zPer;
+          build_phase<<<numBlocks_3c, dimBlocks_3c>>>(i, _parts[dev],
+            _phase[dev], _dom[dev], X, Y, Z,
+            parts[i].cage.ibe, parts[i].cage.ie,
+            parts[i].cage.jbe, parts[i].cage.je,
+            parts[i].cage.kbe, parts[i].cage.ke);
+        }
+      }
+    }
 
+    // fill in phase ghost cells for periodic boundary conditions
+    dim3 dimBlocks_c(threads_c, threads_c);
+    dim3 numBlocks_c(blocks_y, blocks_z);
+
+    if(bc.uW == PERIODIC && bc.uE == PERIODIC) {
+      blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
+      blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
       numBlocks_c.x = blocks_y;
       numBlocks_c.y = blocks_z;
+      cage_phases_periodic_x<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
+        _dom[dev]);
+    }
+    
+    if(bc.uS == PERIODIC && bc.uN == PERIODIC) {
+      blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
+      blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
+      numBlocks_c.x = blocks_z;
+      numBlocks_c.y = blocks_x;
+      cage_phases_periodic_y<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
+        _dom[dev]);
+    }
 
-      if(parts[i].y > (dom[dev].ye - parts[i].r)) Y = parts[i].y - dom[dev].yl;
-      else Y = parts[i].y;
-      if(parts[i].z < (dom[dev].zs + parts[i].r)) Z = parts[i].z + dom[dev].zl;
-      else Z = parts[i].z;
+    if(bc.uB == PERIODIC && bc.uT == PERIODIC) {
+      blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
+      blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
+      numBlocks_c.x = blocks_x;
+      numBlocks_c.y = blocks_y;
+      cage_phases_periodic_z<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
+        _dom[dev]);
+    }
 
-      if(blocks_y > 0 && blocks_z > 0)
-        build_cage<<<numBlocks_c, dimBlocks_c>>>(i, _parts[dev],
-          _phase[dev], _phase_shell[dev], _dom[dev],
-          Y, Z,
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.ks, parts[i].cage.kbs);
+    // do flagging of particle shell
 
-      // TS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_c);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_c);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - (parts[i].cage.kbe))
-        / (real) threads_c);
+    threads_x = MAX_THREADS_DIM;
+    threads_y = MAX_THREADS_DIM;
+    threads_z = MAX_THREADS_DIM;
 
+    // x
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
+
+    dim3 dimBlocks_cu(threads_y, threads_z);
+    dim3 numBlocks_cu(blocks_y, blocks_z);
+
+    if(blocks_y > 0 && blocks_z > 0)
+      phase_shell_x<<<numBlocks_cu, dimBlocks_cu>>>(
+        _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev]);
+
+    // y
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
+
+    dim3 dimBlocks_cv(threads_z, threads_x);
+    dim3 numBlocks_cv(blocks_z, blocks_x);
+
+    if(blocks_x > 0 && blocks_z > 0)
+      phase_shell_y<<<numBlocks_cv, dimBlocks_cv>>>(
+        _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev]);
+
+    // z
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
+
+    dim3 dimBlocks_cw(threads_x, threads_y);
+    dim3 numBlocks_cw(blocks_x, blocks_y);
+    
+    if(blocks_x > 0 && blocks_y > 0)
+      phase_shell_z<<<numBlocks_cw, dimBlocks_cw>>>(
+        _parts[dev],  _dom[dev], _phase[dev], _phase_shell[dev]);
+
+    // fill in phase shell ghost cells for periodic boundary conditions
+    if(bc.uW == PERIODIC && bc.uE == PERIODIC) {
+      blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
+      blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
       numBlocks_c.x = blocks_y;
       numBlocks_c.y = blocks_z;
+      cage_phases_periodic_x<<<numBlocks_c, dimBlocks_c>>>(_phase_shell[dev],
+        _dom[dev]);
+    }
+    
+    if(bc.uS == PERIODIC && bc.uN == PERIODIC) {
+      blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
+      blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
+      numBlocks_c.x = blocks_z;
+      numBlocks_c.y = blocks_x;
+      cage_phases_periodic_y<<<numBlocks_c, dimBlocks_c>>>(_phase_shell[dev],
+        _dom[dev]);
+    }
 
-      if(parts[i].y < (dom[dev].ys + parts[i].r)) Y = parts[i].y + dom[dev].yl;
-      else Y = parts[i].y;
-      if(parts[i].z > (dom[dev].ze - parts[i].r)) Z = parts[i].z - dom[dev].zl;
-      else Z = parts[i].z;
+    if(bc.uB == PERIODIC && bc.uT == PERIODIC) {
+      blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
+      blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
+      numBlocks_c.x = blocks_x;
+      numBlocks_c.y = blocks_y;
+      cage_phases_periodic_z<<<numBlocks_c, dimBlocks_c>>>(_phase_shell[dev],
+        _dom[dev]);
+    }
 
-      if(blocks_y > 0 && blocks_z > 0)
-        build_cage<<<numBlocks_c, dimBlocks_c>>>(i, _parts[dev],
-          _phase[dev], _phase_shell[dev], _dom[dev],
-          Y, Z,
-          parts[i].cage.js, parts[i].cage.jbs,
-          parts[i].cage.kbe, parts[i].cage.ke);
+    // flag u, v, w on particles
+    // u
+    
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
+    
+    numBlocks_cu.x = blocks_y;
+    numBlocks_cu.y = blocks_z;
 
-      // TN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_c);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - (parts[i].cage.jbe))
-        / (real) threads_c);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - (parts[i].cage.kbe))
-        / (real) threads_c);
+    if(blocks_y > 0 && blocks_z > 0)
+      cage_flag_u<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
+      _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev]);
 
-      numBlocks_c.x = blocks_y;
-      numBlocks_c.y = blocks_z;
+    // v
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
 
-      if(parts[i].y > (dom[dev].ye - parts[i].r)) Y = parts[i].y - dom[dev].yl;
-      else Y = parts[i].y;
-      if(parts[i].z > (dom[dev].ze - parts[i].r)) Z = parts[i].z - dom[dev].zl;
-      else Z = parts[i].z;
+    numBlocks_cv.x = blocks_z;
+    numBlocks_cv.y = blocks_x;
 
-      if(blocks_y > 0 && blocks_z > 0)
-        build_cage<<<numBlocks_c, dimBlocks_c>>>(i, _parts[dev],
-          _phase[dev], _phase_shell[dev], _dom[dev],
-          Y, Z,
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.kbe, parts[i].cage.ke);
+    if(blocks_x > 0 && blocks_z > 0)
+      cage_flag_v<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
+      _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev]);
 
-      // fill in ghost cells for periodic boundary conditions
-      if(bc.uW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        numBlocks_c.x = blocks_y;
-        numBlocks_c.y = blocks_z;
-        cage_phases_periodic_W<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.uE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        numBlocks_c.x = blocks_y;
-        numBlocks_c.y = blocks_z;
-        cage_phases_periodic_E<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.vS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        numBlocks_c.x = blocks_z;
-        numBlocks_c.y = blocks_x;
-        cage_phases_periodic_S<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.vN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        numBlocks_c.x = blocks_z;
-        numBlocks_c.y = blocks_x;
-        cage_phases_periodic_N<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.wB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        numBlocks_c.x = blocks_x;
-        numBlocks_c.y = blocks_y;
-        cage_phases_periodic_B<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.wT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        numBlocks_c.x = blocks_x;
-        numBlocks_c.y = blocks_y;
-        cage_phases_periodic_T<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
+    // w
+    blocks_x = (int)ceil((real) dom[dev].Gcc.in / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_z);
 
-      // do flagging
+    numBlocks_cw.x = blocks_x;
+    numBlocks_cw.y = blocks_y;
 
-      threads_x = MAX_THREADS_DIM;
-      threads_y = MAX_THREADS_DIM;
-      threads_z = MAX_THREADS_DIM;
+    if(blocks_x > 0 && blocks_y > 0)
+      cage_flag_w<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
+        _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev]);
 
-      // u
-      // BS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
+    // flag external boundaries
 
-      dim3 dimBlocks_cu(threads_y, threads_z);
-      dim3 numBlocks_cu(blocks_y, blocks_z);
+    if(bc.uW != PERIODIC && bc.uE != PERIODIC) 
+    flag_external_u<<<numBlocks_u, dimBlocks_u>>>(_flag_u[dev], _dom[dev]);
+    if(bc.vS != PERIODIC && bc.vN != PERIODIC) 
+    flag_external_v<<<numBlocks_v, dimBlocks_v>>>(_flag_v[dev], _dom[dev]);
+    if(bc.wB != PERIODIC && bc.wT != PERIODIC) 
+    flag_external_w<<<numBlocks_w, dimBlocks_w>>>(_flag_w[dev], _dom[dev]);
 
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_1<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.js, parts[i].cage.jbs,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // BN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
+    // fill in ghost cells for periodic boundary conditions
+    // flag_u
+    if(bc.uW == PERIODIC && bc.uE == PERIODIC) {
+      blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
+      blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
       numBlocks_cu.x = blocks_y;
       numBlocks_cu.y = blocks_z;
+      cage_flag_u_periodic_x<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
+        _dom[dev]);
+    }
+    if(bc.uS == PERIODIC && bc.uN == PERIODIC) {
+      blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
+      blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
+      numBlocks_cu.x = blocks_z;
+      numBlocks_cu.y = blocks_x;
+      cage_flag_u_periodic_y<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
+        _dom[dev]);
+    }
+    if(bc.uB == PERIODIC && bc.uT == PERIODIC) {
+      blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
+      blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
+      numBlocks_cu.x = blocks_x;
+      numBlocks_cu.y = blocks_y;
+      cage_flag_u_periodic_z<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
+        _dom[dev]);
+    }
 
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_1<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // TS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_1<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.js, parts[i].cage.jbs,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // TN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_1<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // v
-      // BW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
-      dim3 dimBlocks_cv(threads_z, threads_x);
-      dim3 numBlocks_cv(blocks_z, blocks_x);
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_1<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_v[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // BE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
+    //flag_v
+    if(bc.vW == PERIODIC && bc.vW == PERIODIC) {
+      blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
+      blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
+      numBlocks_cv.x = blocks_y;
+      numBlocks_cv.y = blocks_z;
+      cage_flag_v_periodic_x<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
+        _dom[dev]);
+    }
+    if(bc.vS == PERIODIC && bc.vN == PERIODIC) {
+      blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
+      blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
       numBlocks_cv.x = blocks_z;
       numBlocks_cv.y = blocks_x;
+      cage_flag_v_periodic_y<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
+        _dom[dev]);
+    }
+    if(bc.vB == PERIODIC && bc.vT == PERIODIC) {
+      blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
+      blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
+      numBlocks_cv.x = blocks_x;
+      numBlocks_cv.y = blocks_y;
+      cage_flag_v_periodic_z<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
+        _dom[dev]);
+    }
 
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_1<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_v[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // TW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_1<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_v[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // TE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_1<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_v[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // w
-      // SW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      dim3 dimBlocks_cw(threads_x, threads_y);
-      dim3 numBlocks_cw(blocks_x, blocks_y);
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_1<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_w[dev],
-          _parts[dev],  _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.js, parts[i].cage.jbs);
-
-      // SE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
+    // flag_w
+    if(bc.wW == PERIODIC && bc.wE == PERIODIC) {
+      blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
+      blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
+      numBlocks_cw.x = blocks_y;
+      numBlocks_cw.y = blocks_z;
+      cage_flag_w_periodic_x<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
+        _dom[dev]);
+    }
+    if(bc.wS == PERIODIC && bc.wN == PERIODIC) {
+      blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
+      blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
+      numBlocks_cw.x = blocks_z;
+      numBlocks_cw.y = blocks_x;
+      cage_flag_w_periodic_y<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
+        _dom[dev]);
+    }
+    if(bc.wB == PERIODIC && bc.wT == PERIODIC) {
+      blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
+      blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
       numBlocks_cw.x = blocks_x;
       numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_1<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.js, parts[i].cage.jbs);
-
-      // NW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_1<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.jbe, parts[i].cage.je);
-
-      // NE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_1<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev], _phase_shell[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.jbe, parts[i].cage.je);
-
-      // fill in ghost cells for periodic boundary conditions
-      if(bc.uW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        numBlocks_c.x = blocks_y;
-        numBlocks_c.y = blocks_z;
-        cage_phases_periodic_W<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.uE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        numBlocks_c.x = blocks_y;
-        numBlocks_c.y = blocks_z;
-        cage_phases_periodic_E<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.vS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        numBlocks_c.x = blocks_z;
-        numBlocks_c.y = blocks_x;
-        cage_phases_periodic_S<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.vN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gcc.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        numBlocks_c.x = blocks_z;
-        numBlocks_c.y = blocks_x;
-        cage_phases_periodic_N<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.wB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        numBlocks_c.x = blocks_x;
-        numBlocks_c.y = blocks_y;
-        cage_phases_periodic_B<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-      if(bc.wT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gcc.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gcc.jnb / (real) threads_y);
-        numBlocks_c.x = blocks_x;
-        numBlocks_c.y = blocks_y;
-        cage_phases_periodic_T<<<numBlocks_c, dimBlocks_c>>>(_phase[dev],
-          _phase_shell[dev], _dom[dev]);
-      }
-
-      // fill in ghost cells for periodic boundary conditions
-      if(bc.uW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        numBlocks_cu.x = blocks_y;
-        numBlocks_cu.y = blocks_z;
-        cage_flag_u_periodic_W<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        numBlocks_cu.x = blocks_y;
-        numBlocks_cu.y = blocks_z;
-        cage_flag_u_periodic_E<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        numBlocks_cu.x = blocks_z;
-        numBlocks_cu.y = blocks_x;
-        cage_flag_u_periodic_S<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        numBlocks_cu.x = blocks_z;
-        numBlocks_cu.y = blocks_x;
-        cage_flag_u_periodic_N<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        numBlocks_cu.x = blocks_x;
-        numBlocks_cu.y = blocks_y;
-        cage_flag_u_periodic_B<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        numBlocks_cu.x = blocks_x;
-        numBlocks_cu.y = blocks_y;
-        cage_flag_u_periodic_T<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-
-      if(bc.vW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        numBlocks_cv.x = blocks_y;
-        numBlocks_cv.y = blocks_z;
-        cage_flag_v_periodic_W<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        numBlocks_cv.x = blocks_y;
-        numBlocks_cv.y = blocks_z;
-        cage_flag_v_periodic_E<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        numBlocks_cv.x = blocks_z;
-        numBlocks_cv.y = blocks_x;
-        cage_flag_v_periodic_S<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        numBlocks_cv.x = blocks_z;
-        numBlocks_cv.y = blocks_x;
-        cage_flag_v_periodic_N<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        numBlocks_cv.x = blocks_x;
-        numBlocks_cv.y = blocks_y;
-        cage_flag_v_periodic_B<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        numBlocks_cv.x = blocks_x;
-        numBlocks_cv.y = blocks_y;
-        cage_flag_v_periodic_T<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-
-      if(bc.wW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        numBlocks_cw.x = blocks_y;
-        numBlocks_cw.y = blocks_z;
-        cage_flag_w_periodic_W<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        numBlocks_cw.x = blocks_y;
-        numBlocks_cw.y = blocks_z;
-        cage_flag_w_periodic_E<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        numBlocks_cw.x = blocks_z;
-        numBlocks_cw.y = blocks_x;
-        cage_flag_w_periodic_S<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        numBlocks_cw.x = blocks_z;
-        numBlocks_cw.y = blocks_x;
-        cage_flag_w_periodic_N<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        numBlocks_cw.x = blocks_x;
-        numBlocks_cw.y = blocks_y;
-        cage_flag_w_periodic_B<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        numBlocks_cw.x = blocks_x;
-        numBlocks_cw.y = blocks_y;
-        cage_flag_w_periodic_T<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-
-      // create a copy of the flags for this step so intermediate flags don't
-      // corrupt algorithm
-
-      int *_flag_u_tmp;
-      int *_flag_v_tmp;
-      int *_flag_w_tmp;
-      checkCudaErrors(cudaMalloc((void**) &(_flag_u_tmp),
-        sizeof(int) * dom[dev].Gfx.s3b));
-      gpumem += sizeof(int) * dom[dev].Gfx.s3b;
-      checkCudaErrors(cudaMalloc((void**) &(_flag_v_tmp),
-        sizeof(int) * dom[dev].Gfy.s3b));
-      gpumem += sizeof(int) * dom[dev].Gfy.s3b;
-      checkCudaErrors(cudaMalloc((void**) &(_flag_w_tmp),
-        sizeof(int) * dom[dev].Gfz.s3b));
-      gpumem += sizeof(int) * dom[dev].Gfz.s3b;
-      checkCudaErrors(cudaMemcpy(_flag_u_tmp, _flag_u[dev],
-        sizeof(int) * dom[dev].Gfx.s3b, cudaMemcpyDeviceToDevice));
-      checkCudaErrors(cudaMemcpy(_flag_v_tmp, _flag_v[dev],
-        sizeof(int) * dom[dev].Gfy.s3b, cudaMemcpyDeviceToDevice));
-      checkCudaErrors(cudaMemcpy(_flag_w_tmp, _flag_w[dev],
-        sizeof(int) * dom[dev].Gfz.s3b, cudaMemcpyDeviceToDevice));
-
-      // u
-      // BS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_2<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u_tmp,
-          _flag_v[dev], _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.js, parts[i].cage.jbs,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // BN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_2<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u_tmp,
-          _flag_v[dev], _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // TS quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_2<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u_tmp,
-          _flag_v[dev], _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.js, parts[i].cage.jbs,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // TN quadrant
-      blocks_x = (int)ceil((real) parts[i].cage.in / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cu.x = blocks_y;
-      numBlocks_cu.y = blocks_z;
-
-      if(blocks_y > 0 && blocks_z > 0)
-        cage_flag_u_2<<<numBlocks_cu, dimBlocks_cu>>>(i, _flag_u_tmp,
-          _flag_v[dev], _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.jbe, parts[i].cage.je,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // v
-      // BW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_2<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_u[dev],
-          _flag_v_tmp, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // BE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.kbs - parts[i].cage.ks)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_2<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_u[dev],
-          _flag_v_tmp, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.ks, parts[i].cage.kbs);
-
-      // TW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_2<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_u[dev],
-          _flag_v_tmp, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // TE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) parts[i].cage.jn / (real) threads_y);
-      blocks_z = (int)ceil((real) (parts[i].cage.ke - parts[i].cage.kbe)
-        / (real) threads_z);
-
-      numBlocks_cv.x = blocks_z;
-      numBlocks_cv.y = blocks_x;
-
-      if(blocks_x > 0 && blocks_z > 0)
-        cage_flag_v_2<<<numBlocks_cv, dimBlocks_cv>>>(i, _flag_u[dev],
-          _flag_v_tmp, _flag_w[dev],
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.kbe, parts[i].cage.ke);
-
-      // w
-      // SW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_2<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_u[dev],
-          _flag_v[dev], _flag_w_tmp,
-          _parts[dev],  _dom[dev], _phase[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.js, parts[i].cage.jbs);
-
-      // SE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.jbs - parts[i].cage.js)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_2<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_u[dev],
-          _flag_v[dev], _flag_w_tmp,
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.js, parts[i].cage.jbs);
-
-      // NW quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ibs - parts[i].cage.is)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_2<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_u[dev],
-          _flag_v[dev], _flag_w_tmp,
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.is, parts[i].cage.ibs,
-          parts[i].cage.jbe, parts[i].cage.je);
-
-      // NE quadrant
-      blocks_x = (int)ceil((real) (parts[i].cage.ie - parts[i].cage.ibe)
-        / (real) threads_x);
-      blocks_y = (int)ceil((real) (parts[i].cage.je - parts[i].cage.jbe)
-        / (real) threads_y);
-      blocks_z = (int)ceil((real) parts[i].cage.kn / (real) threads_z);
-
-      numBlocks_cw.x = blocks_x;
-      numBlocks_cw.y = blocks_y;
-
-      if(blocks_x > 0 && blocks_y > 0)
-        cage_flag_w_2<<<numBlocks_cw, dimBlocks_cw>>>(i, _flag_u[dev],
-          _flag_v[dev], _flag_w_tmp,
-          _parts[dev], _dom[dev], _phase[dev],
-          parts[i].cage.ibe, parts[i].cage.ie,
-          parts[i].cage.jbe, parts[i].cage.je);
-
-      // now copy the results back
-
-      checkCudaErrors(cudaMemcpy(_flag_u[dev], _flag_u_tmp,
-        sizeof(int) * dom[dev].Gfx.s3b, cudaMemcpyDeviceToDevice));
-      checkCudaErrors(cudaMemcpy(_flag_v[dev], _flag_v_tmp,
-        sizeof(int) * dom[dev].Gfy.s3b, cudaMemcpyDeviceToDevice));
-      checkCudaErrors(cudaMemcpy(_flag_w[dev], _flag_w_tmp,
-        sizeof(int) * dom[dev].Gfz.s3b, cudaMemcpyDeviceToDevice));
-
-      // clean up copies
-      checkCudaErrors(cudaFree(_flag_u_tmp));
-      checkCudaErrors(cudaFree(_flag_v_tmp));
-      checkCudaErrors(cudaFree(_flag_w_tmp));
-
-      // fill in ghost cells for periodic boundary conditions
-      if(bc.uW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        numBlocks_cu.x = blocks_y;
-        numBlocks_cu.y = blocks_z;
-        cage_flag_u_periodic_W<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        numBlocks_cu.x = blocks_y;
-        numBlocks_cu.y = blocks_z;
-        cage_flag_u_periodic_E<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        numBlocks_cu.x = blocks_z;
-        numBlocks_cu.y = blocks_x;
-        cage_flag_u_periodic_S<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        numBlocks_cu.x = blocks_z;
-        numBlocks_cu.y = blocks_x;
-        cage_flag_u_periodic_N<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        numBlocks_cu.x = blocks_x;
-        numBlocks_cu.y = blocks_y;
-        cage_flag_u_periodic_B<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-      if(bc.uT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfx.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
-        numBlocks_cu.x = blocks_x;
-        numBlocks_cu.y = blocks_y;
-        cage_flag_u_periodic_T<<<numBlocks_cu, dimBlocks_cu>>>(_flag_u[dev],
-          _dom[dev]);
-      }
-
-      if(bc.vW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        numBlocks_cv.x = blocks_y;
-        numBlocks_cv.y = blocks_z;
-        cage_flag_v_periodic_W<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        numBlocks_cv.x = blocks_y;
-        numBlocks_cv.y = blocks_z;
-        cage_flag_v_periodic_E<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        numBlocks_cv.x = blocks_z;
-        numBlocks_cv.y = blocks_x;
-        cage_flag_v_periodic_S<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        numBlocks_cv.x = blocks_z;
-        numBlocks_cv.y = blocks_x;
-        cage_flag_v_periodic_N<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        numBlocks_cv.x = blocks_x;
-        numBlocks_cv.y = blocks_y;
-        cage_flag_v_periodic_B<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-      if(bc.vT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfy.jnb / (real) threads_y);
-        numBlocks_cv.x = blocks_x;
-        numBlocks_cv.y = blocks_y;
-        cage_flag_v_periodic_T<<<numBlocks_cv, dimBlocks_cv>>>(_flag_v[dev],
-          _dom[dev]);
-      }
-
-      if(bc.wW == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        numBlocks_cw.x = blocks_y;
-        numBlocks_cw.y = blocks_z;
-        cage_flag_w_periodic_W<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wE == PERIODIC) {
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        numBlocks_cw.x = blocks_y;
-        numBlocks_cw.y = blocks_z;
-        cage_flag_w_periodic_E<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wS == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        numBlocks_cw.x = blocks_z;
-        numBlocks_cw.y = blocks_x;
-        cage_flag_w_periodic_S<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wN == PERIODIC) {
-        blocks_z = (int)ceil((real) dom[dev].Gfz.knb / (real) threads_z);
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        numBlocks_cw.x = blocks_z;
-        numBlocks_cw.y = blocks_x;
-        cage_flag_w_periodic_N<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wB == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        numBlocks_cw.x = blocks_x;
-        numBlocks_cw.y = blocks_y;
-        cage_flag_w_periodic_B<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
-      if(bc.wT == PERIODIC) {
-        blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
-        blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
-        numBlocks_cw.x = blocks_x;
-        numBlocks_cw.y = blocks_y;
-        cage_flag_w_periodic_T<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
-          _dom[dev]);
-      }
+      cage_flag_w_periodic_z<<<numBlocks_cw, dimBlocks_cw>>>(_flag_w[dev],
+        _dom[dev]);
     }
   }
 }
@@ -1467,7 +902,7 @@ void cuda_part_BC(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
     int threads_x = MAX_THREADS_DIM;
     int threads_y = MAX_THREADS_DIM;
@@ -1515,7 +950,7 @@ void cuda_part_BC_star(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
     int threads_x = MAX_THREADS_DIM;
     int threads_y = MAX_THREADS_DIM;
@@ -1570,16 +1005,42 @@ void cuda_part_BC_p(int dev)
   dim3 dimBlocks_c(threads_c, threads_c);
   dim3 numBlocks_c(blocks_y, blocks_z);
 
-  real dt0tmp = 0.;
-  if(dt0 > 0) dt0tmp = dt0;
   part_BC_p<<<numBlocks_c, dimBlocks_c>>>(_p0[dev], _rhs_p[dev], _phase[dev],
     _phase_shell[dev], _parts[dev], _dom[dev],
-    mu, nu, 0.5*(dt+dt0tmp), gradP, rho_f, coeff_stride,
+    mu, nu, dt, dt0, gradP, rho_f, coeff_stride,
     _pnm_re00[dev], _pnm_im00[dev],
     _phinm_re00[dev], _phinm_im00[dev], _chinm_re00[dev], _chinm_im00[dev],
     _pnm_re[dev], _pnm_im[dev],
     _phinm_re[dev], _phinm_im[dev], _chinm_re[dev], _chinm_im[dev]);
 }
+
+
+extern "C"
+void cuda_part_p_fill(void)
+{
+  // parallize across domains
+  #pragma omp parallel num_threads(nsubdom)
+  {
+    int dev = omp_get_thread_num();
+    (cudaSetDevice(dev + dev_start));
+
+    int threads_c = MAX_THREADS_DIM;
+    int blocks_y = 0;
+    int blocks_z = 0;
+
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_c);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_c);
+
+    dim3 dimblocks_c(threads_c, threads_c);
+    dim3 numblocks_c(blocks_y, blocks_z);
+
+    part_BC_p_fill<<<numblocks_c, dimblocks_c>>>(_p[dev], _phase[dev],
+      _parts[dev], _dom[dev],
+      mu, nu, rho_f, gradP, coeff_stride,
+      _pnm_re[dev], _pnm_im[dev]);
+  }
+}
+
 
 extern "C"
 void cuda_store_coeffs(void)
@@ -1588,7 +1049,7 @@ void cuda_store_coeffs(void)
   #pragma omp parallel num_threads(nsubdom)
   {
     int dev = omp_get_thread_num();
-    checkCudaErrors(cudaSetDevice(dev + dev_start));
+    (cudaSetDevice(dev + dev_start));
 
     // coeff00 & coeff ==> coeff0 (Adams-Bashforth)
     dim3 dimBlocks(coeff_stride);
@@ -1604,17 +1065,17 @@ void cuda_store_coeffs(void)
         _chinm_re[dev], _chinm_im[dev], coeff_stride);
     }
 */
-    checkCudaErrors(cudaMemcpy(_pnm_re00[dev], _pnm_re[dev],
+    (cudaMemcpy(_pnm_re00[dev], _pnm_re[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaMemcpy(_pnm_im00[dev], _pnm_im[dev],
+    (cudaMemcpy(_pnm_im00[dev], _pnm_im[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_re00[dev], _phinm_re[dev],
+    (cudaMemcpy(_phinm_re00[dev], _phinm_re[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaMemcpy(_phinm_im00[dev], _phinm_im[dev],
+    (cudaMemcpy(_phinm_im00[dev], _phinm_im[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_re00[dev], _chinm_re[dev],
+    (cudaMemcpy(_chinm_re00[dev], _chinm_re[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaMemcpy(_chinm_im00[dev], _chinm_im[dev],
+    (cudaMemcpy(_chinm_im00[dev], _chinm_im[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
   }
 }

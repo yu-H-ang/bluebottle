@@ -1,8 +1,8 @@
 /*******************************************************************************
- ******************************* BLUEBOTTLE-1.0 ********************************
+ ********************************* BLUEBOTTLE **********************************
  *******************************************************************************
  *
- *  Copyright 2012 - 2014 Adam Sierakowski, The Johns Hopkins University
+ *  Copyright 2012 - 2015 Adam Sierakowski, The Johns Hopkins University
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -234,6 +234,9 @@ typedef struct part_struct {
   real x;
   real y;
   real z;
+  real x0;
+  real y0;
+  real z0;
   real u;
   real v;
   real w;
@@ -243,6 +246,9 @@ typedef struct part_struct {
   real udot;
   real vdot;
   real wdot;
+  real udot0;
+  real vdot0;
+  real wdot0;
   real axx;
   real axy;
   real axz;
@@ -261,6 +267,9 @@ typedef struct part_struct {
   real oxdot;
   real oydot;
   real ozdot;
+  real oxdot0;
+  real oydot0;
+  real ozdot0;
   real Fx;
   real Fy;
   real Fz;
@@ -297,6 +306,10 @@ typedef struct part_struct {
   real spring_l;
   int translating;
   int rotating;
+  int bin;
+  real St;
+  real e_dry;
+  real l_rough;
 } part_struct;
 /*
  * PURPOSE
@@ -306,6 +319,9 @@ typedef struct part_struct {
  *  * x -- the particle location component
  *  * y -- the particle location component
  *  * z -- the particle location component
+ *  * x0 -- the particle location component (previous timestep)
+ *  * y0 -- the particle location component (previous timestep)
+ *  * z0 -- the particle location component (previous timestep)
  *  * u -- linear velocity in x-direction
  *  * v -- linear velocity in y-direction
  *  * w -- linear velocity in z-direction
@@ -366,6 +382,10 @@ typedef struct part_struct {
  *  * spring_l -- the relaxed length of the spring
  *  * translating -- 1 if allowed to translate, 0 if not
  *  * rotating -- 1 if allowed to rotate, 0 if not
+ *  * bin -- which bin the particle resides in
+ *  * e_dry -- dry coefficient of restitution
+ *  * l_rough -- particle surface roughness length
+ *  * St -- particle-wall interaction Stokes number
  ******
  */
 
@@ -378,6 +398,42 @@ extern int nparts;
 /*
  * PURPOSE
  *  Define the total number of particles in the domain.
+ ******
+ */
+
+/****v* particle/interactionLength
+ * NAME
+ *  interactionLength
+ * TYPE
+ */
+extern real interactionLength;
+/*
+ * PURPOSE
+ *  Defines the particle-particle interaction length
+ ******
+ */
+
+/****v* particle/binDom
+ * NAME
+ *  binDom
+ * TYPE
+ */
+extern dom_struct binDom;
+/*
+ * PURPOSE
+ *  A domain struct for the bin
+ ******
+ */
+
+ /****v* particle/_binDom
+ * NAME
+ *  _binDom
+ * TYPE
+ */
+extern dom_struct *_binDom;
+/*
+ * PURPOSE
+ *  A domain struct for the bin (device)
  ******
  */
 
@@ -938,6 +994,18 @@ void parts_show_config(void);
  ******
  */
 
+/****f* particle/bin_show_config()
+ * NAME
+ *  bin_show_config()
+ * USAGE
+ */
+void bin_show_config(void);
+/*
+ * FUNCTION
+ *  Write bin specifications to screen.
+ ******
+ */
+
 /****f* particle/parts_init()
  * NAME
  *  parts_init()
@@ -977,6 +1045,21 @@ void flags_reset(void);
 /*
  * FUNCTION
  *  Reinitializes flag arrays to no boundaries (1).
+ ******
+ */
+
+/****f* particle/binDom_init()
+ * NAME
+ *  binDom_init()
+ * USAGE
+ *
+ */
+int binDom_init(void);
+/*
+ * FUNCTION
+ *  Initialize the binDom structure
+ * RESULT
+ *  EXIT_SUCCESS if successful, EXIT_FAILURE otherwise.
  ******
  */
 
