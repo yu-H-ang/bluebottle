@@ -1156,4 +1156,15 @@ real cuda_lamb_err(void);
  ******
  */
 
+typedef struct geoinfo_struct {
+  real Pnm[10];
+  real phisin[3];
+  real phicos[3];
+} geoinfo_struct;
+
+extern geoinfo_struct **_geoinfo_PBC_u;
+extern geoinfo_struct **_geoinfo_PBC_v;
+extern geoinfo_struct **_geoinfo_PBC_w;
+extern geoinfo_struct **_geoinfo_PBC_p;
+
 #endif

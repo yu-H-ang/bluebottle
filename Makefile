@@ -21,16 +21,16 @@
 ################################################################################
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ EDIT: DEPENDENCIES ~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-MPI_DIR =
-HDF5_DIR =
-CGNS_DIR =
-CUSP_DIR =
-CUDA_DIR =
+MPI_DIR  = /cm/shared/apps/Intel/openmpi/1.8.4
+HDF5_DIR = /cm/shared/apps/hdf5_18/1.8.15
+CGNS_DIR = /home-4/yzhan175@jhu.edu/deps/cgns
+CUSP_DIR = /home-4/yzhan175@jhu.edu/deps/cusplibrary
+CUDA_DIR = /cm/shared/apps/cuda/7.0
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ EDIT: COMPILERS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-MPICC =
-NVCC =
+MPICC = mpicc
+NVCC = nvcc
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 PREC = DOUBLE

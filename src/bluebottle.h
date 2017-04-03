@@ -3401,4 +3401,6 @@ void cuda_colocate_Gfz(real *_w, real *_w_co, dom_struct *_dom);
  ******
  */
 
+void cuda_part_geoinfo(void);
+
 #endif
