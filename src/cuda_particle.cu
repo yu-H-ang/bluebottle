@@ -77,6 +77,15 @@ void cuda_part_malloc(void)
   cpumem += nsubdom * sizeof(int);
   _flag_w = (int**) malloc(nsubdom * sizeof(int*));
   cpumem += nsubdom * sizeof(int);
+  
+  _geoinfo_PBC_u = (geoinfo_struct**) malloc(nsubdom * sizeof(geoinfo_struct*));
+  cpumem += nsubdom * sizeof(geoinfo_struct*);
+  _geoinfo_PBC_v = (geoinfo_struct**) malloc(nsubdom * sizeof(geoinfo_struct*));
+  cpumem += nsubdom * sizeof(geoinfo_struct*);
+  _geoinfo_PBC_w = (geoinfo_struct**) malloc(nsubdom * sizeof(geoinfo_struct*));
+  cpumem += nsubdom * sizeof(geoinfo_struct*);
+  _geoinfo_PBC_p = (geoinfo_struct**) malloc(nsubdom * sizeof(geoinfo_struct*));
+  cpumem += nsubdom * sizeof(geoinfo_struct*);
 
   // allocate device memory on device
   #pragma omp parallel num_threads(nsubdom)
@@ -163,6 +172,19 @@ void cuda_part_malloc(void)
 
     (cudaMalloc((void**) &(_binDom), sizeof(dom_struct)));
     gpumem += sizeof(dom_struct);
+    
+    (cudaMalloc((void**) &(_geoinfo_PBC_u[dev]),
+      sizeof(geoinfo_struct) * dom[dev].Gfx.s3b));
+    gpumem += sizeof(geoinfo_struct) * dom[dev].Gfx.s3b;
+    (cudaMalloc((void**) &(_geoinfo_PBC_v[dev]),
+      sizeof(geoinfo_struct) * dom[dev].Gfy.s3b));
+    gpumem += sizeof(geoinfo_struct) * dom[dev].Gfy.s3b;
+    (cudaMalloc((void**) &(_geoinfo_PBC_w[dev]),
+      sizeof(geoinfo_struct) * dom[dev].Gfz.s3b));
+    gpumem += sizeof(geoinfo_struct) * dom[dev].Gfz.s3b;
+    (cudaMalloc((void**) &(_geoinfo_PBC_p[dev]),
+      sizeof(geoinfo_struct) * dom[dev].Gcc.s3b));
+    gpumem += sizeof(geoinfo_struct) * dom[dev].Gcc.s3b;
   }
 }
 
@@ -324,6 +346,10 @@ void cuda_part_free(void)
     (cudaFree(_flag_u[dev]));
     (cudaFree(_flag_v[dev]));
     (cudaFree(_flag_w[dev]));
+    (cudaFree(_geoinfo_PBC_u[dev]));
+    (cudaFree(_geoinfo_PBC_v[dev]));
+    (cudaFree(_geoinfo_PBC_w[dev]));
+    (cudaFree(_geoinfo_PBC_p[dev]));
   }
     (cudaFree(_binDom));
 
@@ -351,6 +377,10 @@ void cuda_part_free(void)
   free(_flag_u);
   free(_flag_v);
   free(_flag_w);
+  free(_geoinfo_PBC_u);
+  free(_geoinfo_PBC_v);
+  free(_geoinfo_PBC_w);
+  free(_geoinfo_PBC_p);
 }
 
 extern "C"
@@ -917,7 +947,8 @@ void cuda_part_BC(void)
     dim3 dimBlocks_x(threads_y, threads_z);
     dim3 numBlocks_x(blocks_y, blocks_z);
     part_BC_u<<<numBlocks_x, dimBlocks_x>>>(_u[dev], _phase[dev],
-      _flag_u[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_u[dev], _parts[dev], _dom[dev], _geoinfo_PBC_u[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
 
@@ -927,7 +958,8 @@ void cuda_part_BC(void)
     dim3 dimBlocks_y(threads_z, threads_x);
     dim3 numBlocks_y(blocks_z, blocks_x);
     part_BC_v<<<numBlocks_y, dimBlocks_y>>>(_v[dev], _phase[dev],
-      _flag_v[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_v[dev], _parts[dev], _dom[dev], _geoinfo_PBC_v[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
 
@@ -937,7 +969,8 @@ void cuda_part_BC(void)
     dim3 dimBlocks_z(threads_x, threads_y);
     dim3 numBlocks_z(blocks_x, blocks_y);
     part_BC_w<<<numBlocks_z, dimBlocks_z>>>(_w[dev], _phase[dev],
-      _flag_w[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_w[dev], _parts[dev], _dom[dev], _geoinfo_PBC_w[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
   }
@@ -965,7 +998,8 @@ void cuda_part_BC_star(void)
     dim3 dimBlocks_x(threads_y, threads_z);
     dim3 numBlocks_x(blocks_y, blocks_z);
     part_BC_u<<<numBlocks_x, dimBlocks_x>>>(_u_star[dev], _phase[dev],
-      _flag_u[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_u[dev], _parts[dev], _dom[dev], _geoinfo_PBC_u[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
 
@@ -975,7 +1009,8 @@ void cuda_part_BC_star(void)
     dim3 dimBlocks_y(threads_z, threads_x);
     dim3 numBlocks_y(blocks_z, blocks_x);
     part_BC_v<<<numBlocks_y, dimBlocks_y>>>(_v_star[dev], _phase[dev],
-      _flag_v[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_v[dev], _parts[dev], _dom[dev], _geoinfo_PBC_v[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
 
@@ -985,7 +1020,8 @@ void cuda_part_BC_star(void)
     dim3 dimBlocks_z(threads_x, threads_y);
     dim3 numBlocks_z(blocks_x, blocks_y);
     part_BC_w<<<numBlocks_z, dimBlocks_z>>>(_w_star[dev], _phase[dev],
-      _flag_w[dev], _parts[dev], _dom[dev], nu, coeff_stride,
+      _flag_w[dev], _parts[dev], _dom[dev], _geoinfo_PBC_w[dev],
+      nu, coeff_stride,
       _pnm_re[dev], _pnm_im[dev], _phinm_re[dev], _phinm_im[dev],
       _chinm_re[dev], _chinm_im[dev]);
   }
@@ -1006,7 +1042,7 @@ void cuda_part_BC_p(int dev)
   dim3 numBlocks_c(blocks_y, blocks_z);
 
   part_BC_p<<<numBlocks_c, dimBlocks_c>>>(_p0[dev], _rhs_p[dev], _phase[dev],
-    _phase_shell[dev], _parts[dev], _dom[dev],
+    _phase_shell[dev], _parts[dev], _dom[dev], _geoinfo_PBC_p[dev],
     mu, nu, dt, dt0, gradP, rho_f, coeff_stride,
     _pnm_re00[dev], _pnm_im00[dev],
     _phinm_re00[dev], _phinm_im00[dev], _chinm_re00[dev], _chinm_im00[dev],
@@ -1035,7 +1071,7 @@ void cuda_part_p_fill(void)
     dim3 numblocks_c(blocks_y, blocks_z);
 
     part_BC_p_fill<<<numblocks_c, dimblocks_c>>>(_p[dev], _phase[dev],
-      _parts[dev], _dom[dev],
+      _parts[dev], _dom[dev], _geoinfo_PBC_p[dev],
       mu, nu, rho_f, gradP, coeff_stride,
       _pnm_re[dev], _pnm_im[dev]);
   }
@@ -1077,5 +1113,60 @@ void cuda_store_coeffs(void)
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
     (cudaMemcpy(_chinm_im00[dev], _chinm_im[dev],
       sizeof(real) * coeff_stride*nparts, cudaMemcpyDeviceToDevice));
+  }
+}
+
+extern "C"
+void cuda_part_geoinfo(void)
+{
+  // parallize across domains
+  #pragma omp parallel num_threads(nsubdom)
+  {
+    int dev = omp_get_thread_num();
+    (cudaSetDevice(dev + dev_start));
+
+    int threads_x = MAX_THREADS_DIM;
+    int threads_y = MAX_THREADS_DIM;
+    int threads_z = MAX_THREADS_DIM;
+    int threads_c = MAX_THREADS_DIM;
+    int blocks_x = 0;
+    int blocks_y = 0;
+    int blocks_z = 0;
+    
+    int global_order = 2;//TODO*******************global order
+
+    // u
+    blocks_y = (int)ceil((real) dom[dev].Gfx.jnb / (real) threads_y);
+    blocks_z = (int)ceil((real) dom[dev].Gfx.knb / (real) threads_z);
+    dim3 dimBlocks_x(threads_y, threads_z);
+    dim3 numBlocks_x(blocks_y, blocks_z);
+    part_BC_geoinfo_u<<<numBlocks_x, dimBlocks_x>>>(_geoinfo_PBC_u[dev],
+      _phase[dev], _parts[dev], _dom[dev], global_order);
+
+    // v
+    blocks_z = (int)ceil((real) dom[dev].Gfy.knb / (real) threads_z);
+    blocks_x = (int)ceil((real) dom[dev].Gfy.inb / (real) threads_x);
+    dim3 dimBlocks_y(threads_z, threads_x);
+    dim3 numBlocks_y(blocks_z, blocks_x);
+    part_BC_geoinfo_v<<<numBlocks_y, dimBlocks_y>>>(_geoinfo_PBC_v[dev],
+      _phase[dev], _parts[dev], _dom[dev], global_order);
+
+    // w
+    blocks_x = (int)ceil((real) dom[dev].Gfz.inb / (real) threads_x);
+    blocks_y = (int)ceil((real) dom[dev].Gfz.jnb / (real) threads_y);
+    dim3 dimBlocks_z(threads_x, threads_y);
+    dim3 numBlocks_z(blocks_x, blocks_y);
+    part_BC_geoinfo_w<<<numBlocks_z, dimBlocks_z>>>(_geoinfo_PBC_w[dev],
+      _phase[dev], _parts[dev], _dom[dev], global_order);
+
+    // p
+    blocks_y = (int)ceil((real) dom[dev].Gcc.jn / (real) threads_c);
+    blocks_z = (int)ceil((real) dom[dev].Gcc.kn / (real) threads_c);
+    dim3 dimBlocks_c(threads_c, threads_c);
+    dim3 numBlocks_c(blocks_y, blocks_z);
+    part_BC_geoinfo_p<<<numBlocks_c, dimBlocks_c>>>(_geoinfo_PBC_p[dev],
+      _phase[dev], _parts[dev], _dom[dev], global_order);
+
+
   }
 }

@@ -512,7 +512,7 @@ __global__ void flag_external_w(int *flag_w, dom_struct *dom);
  * USAGE
  */
 __global__ void part_BC_u(real *u, int *phase, int *flag_u,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infou,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im);
@@ -545,7 +545,7 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
  * USAGE
  */
 __global__ void part_BC_v(real *v, int *phase, int *flag_v,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infov,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im);
@@ -578,7 +578,7 @@ __global__ void part_BC_v(real *v, int *phase, int *flag_v,
  * USAGE
  */
 __global__ void part_BC_w(real *w, int *phase, int *flag_w,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infow,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im);
@@ -611,7 +611,7 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
  * USAGE
  */
 __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infop,
   real mu, real nu, real dt, real dt0, gradP_struct gradP, real rho_f, int stride,
   real *pnm_re00, real *pnm_im00, real *phinm_re00, real *phinm_im00,
   real *chinm_re00, real *chinm_im00,
@@ -661,7 +661,7 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
  * USAGE
  */
 __global__ void part_BC_p_fill(real *p, int *phase,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infop,
   real mu, real nu, real rho_f, gradP_struct gradP,
   int stride, real *pnm_re, real *pnm_im);
 /*
@@ -881,7 +881,7 @@ __device__ real DXxchinp(int n, real a, real r, real theta, real phi,
  * USAGE
  */
 __device__ real X_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride);
+  real *pnm_re, real *pnm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -903,7 +903,7 @@ __device__ real X_pn(int n, real theta, real phi,
  * USAGE
  */
 __device__ real X_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride);
+  real *phinm_re, real *phinm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -925,7 +925,7 @@ __device__ real X_phin(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Y_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride);
+  real *pnm_re, real *pnm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -947,7 +947,7 @@ __device__ real Y_pn(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Y_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride);
+  real *phinm_re, real *phinm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -969,7 +969,7 @@ __device__ real Y_phin(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Y_chin(int n, real theta, real phi,
-  real *chinm_re, real *chinm_im, int pp, int stride);
+  real *chinm_re, real *chinm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -991,7 +991,7 @@ __device__ real Y_chin(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Z_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride);
+  real *pnm_re, real *pnm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -1013,7 +1013,7 @@ __device__ real Z_pn(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Z_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride);
+  real *phinm_re, real *phinm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -1035,7 +1035,7 @@ __device__ real Z_phin(int n, real theta, real phi,
  * USAGE
  */
 __device__ real Z_chin(int n, real theta, real phi,
-  real *chinm_re, real *chinm_im, int pp, int stride);
+  real *chinm_re, real *chinm_im, int pp, int stride, geoinfo_struct info);
 /*
  * FUNCTION
  *  Helper function for calculating sums involved in Lamb's solution
@@ -1059,7 +1059,8 @@ __device__ real Z_chin(int n, real theta, real phi,
 __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
   real nu, real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im,
-  int p_ind, int stride, real *Ux, real *Uy, real *Uz);
+  int p_ind, int stride, real *Ux, real *Uy, real *Uz,
+  geoinfo_struct info);
 /*
  * FUNCTION
  *  Calculate the velocities in the Cartesian directions from the
@@ -1090,9 +1091,11 @@ __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
  *  lamb_gradP<<<>>>()
  * USAGE
  */
+/*
 __device__ void lamb_gradP(int order, real a, real r, real theta, real phi,
   real mu, real nu, real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   int p_ind, int stride, real *gPx, real *gPy, real *gPz);
+*/
 /*
  * FUNCTION
  *  Calculate the pressure gradients in the Cartesian directions from the
@@ -1134,5 +1137,19 @@ __global__ void predict_coeffs(real dt0, real dt,
  * ARGUMENTS
  ******
  */
+
+__global__ void part_BC_geoinfo_u(geoinfo_struct *infou, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order);
+
+__global__ void part_BC_geoinfo_v(geoinfo_struct *infov, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order);
+
+__global__ void part_BC_geoinfo_w(geoinfo_struct *infow, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order);
+
+__global__ void part_BC_geoinfo_p(geoinfo_struct *infop, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order);
+
+__device__ real PNM(int n, int m, geoinfo_struct info);
 
 #endif

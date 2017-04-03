@@ -606,7 +606,9 @@ int main(int argc, char *argv[]) {
           expd_update_BC(np, status);
           // TODO: save work by rebuilding only the cages that need to be rebuilt
           cuda_build_cages();
-
+          //******************************
+          cuda_part_geoinfo();
+printf("asdfasdfsdfa\n");
           int iter = 0;
           real iter_err = FLT_MAX;
 

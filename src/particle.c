@@ -75,6 +75,10 @@ real **_phinm_re00;
 real **_phinm_im00;
 real **_chinm_re00;
 real **_chinm_im00;
+geoinfo_struct **_geoinfo_PBC_u;
+geoinfo_struct **_geoinfo_PBC_v;
+geoinfo_struct **_geoinfo_PBC_w;
+geoinfo_struct **_geoinfo_PBC_p;
 
 void parts_read_input(int turb)
 {

@@ -533,7 +533,7 @@ __global__ void flag_external_w(int *flag_w, dom_struct *dom)
 }
 
 __global__ void part_BC_u(real *u, int *phase, int *flag_u,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infou,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im)
@@ -551,7 +551,7 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
   real oy, oz;          // particle angular velocity
   real oydot, ozdot;    // particle angular acceleration
   real uu;              // particle velocity
-
+  
   if(tj < dom->Gfx._jeb && tk < dom->Gfx._keb) {
     for(int i = dom->Gfx._is; i < dom->Gfx._ie; i++) {
       C = i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b;
@@ -619,7 +619,8 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
       lamb_vel(order, a, r, theta, phi,
         nu, pnm_re, pnm_im, phinm_re, phinm_im,
         chinm_re, chinm_im,
-        P, stride, &Ux, &Uy, &Uz);
+        P, stride, &Ux, &Uy, &Uz,
+        infou[C]);
 
       real ocrossr_x = oy*z - oz*y;
       real odotcrossr_x = oydot*z - ozdot*y;
@@ -634,7 +635,7 @@ __global__ void part_BC_u(real *u, int *phase, int *flag_u,
 }
 
 __global__ void part_BC_v(real *v, int *phase, int *flag_v,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infov,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im)
@@ -720,7 +721,8 @@ __global__ void part_BC_v(real *v, int *phase, int *flag_v,
       lamb_vel(order, a, r, theta, phi,
         nu, pnm_re, pnm_im, phinm_re, phinm_im,
         chinm_re, chinm_im,
-        P, stride, &Ux, &Uy, &Uz);
+        P, stride, &Ux, &Uy, &Uz,
+        infov[C]);
 
       // switch reference frame and set boundary condition
       real ocrossr_y = -(ox*z - oz*x);
@@ -736,7 +738,7 @@ __global__ void part_BC_v(real *v, int *phase, int *flag_v,
 }
 
 __global__ void part_BC_w(real *w, int *phase, int *flag_w,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infow,
   real nu, int stride,
   real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im)
@@ -822,7 +824,8 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
       lamb_vel(order, a, r, theta, phi,
         nu, pnm_re, pnm_im, phinm_re, phinm_im,
         chinm_re, chinm_im,
-        P, stride, &Ux, &Uy, &Uz);
+        P, stride, &Ux, &Uy, &Uz,
+        infow[C]);
 
       // switch reference frame and set boundary condition
       real ocrossr_z = ox*y - oy*x;
@@ -838,7 +841,7 @@ __global__ void part_BC_w(real *w, int *phase, int *flag_w,
 }
 
 __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infop,
   real mu, real nu, real dt, real dt0, gradP_struct gradP, real rho_f, int stride,
   real *pnm_re00, real *pnm_im00, real *phinm_re00, real *phinm_im00,
   real *chinm_re00, real *chinm_im00,
@@ -907,15 +910,15 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
 #else
       real ar = a / r;
       real ra = r / a;
-      pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride);
+      pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride, infop[CC]);
       //pp_tmp00 = X_pn(0, theta, phi, pnm_re00, pnm_im00, P, stride);
       for(int n = 1; n <= order; n++) {
         pp_tmp += (1.-0.5*n*(2.*n-1.)/(n+1.)*pow(ar,2.*n+1.))*pow(ra,n)
-          * X_pn(n, theta, phi, pnm_re, pnm_im, P, stride);
+          * X_pn(n, theta, phi, pnm_re, pnm_im, P, stride, infop[CC]);
         //pp_tmp00 += (1.-0.5*n*(2.*n-1.)/(n+1.)*pow(ar,2.*n+1.))*pow(ra,n)
           //* X_pn(n, theta, phi, pnm_re00, pnm_im00, P, stride);
         pp_tmp -= n*(2.*n-1.)*(2.*n+1.)/(n+1.)*pow(ar,n+1.)
-          * X_phin(n, theta, phi, phinm_re, phinm_im, P, stride);
+          * X_phin(n, theta, phi, phinm_re, phinm_im, P, stride, infop[CC]);
         //pp_tmp00 -= n*(2.*n-1.)*(2.*n+1.)/(n+1.)*pow(ar,n+1.)
           //* X_phin(n, theta, phi, phinm_re00, phinm_im00, P, stride);
       }
@@ -940,7 +943,7 @@ __global__ void part_BC_p(real *p, real *p_rhs, int *phase, int *phase_shell,
 }
 
 __global__ void part_BC_p_fill(real *p, int *phase,
-  part_struct *parts, dom_struct *dom,
+  part_struct *parts, dom_struct *dom, geoinfo_struct *infop,
   real mu, real nu, real rho_f, gradP_struct gradP, int stride,
   real *pnm_re, real *pnm_im)
 {
@@ -1000,7 +1003,7 @@ __global__ void part_BC_p_fill(real *p, int *phase,
 #ifdef STEPS
       p[CC] = phase_shell[CC] * p[CC];
 #else
-      pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride);
+      pp_tmp = X_pn(0, theta, phi, pnm_re, pnm_im, P, stride, infop[CC]);
       pp_tmp *= mu*nu/(a*a);
       real ocrossr2 = (oy*z - oz*y) * (oy*z - oz*y);
       ocrossr2 += (ox*z - oz*x) * (ox*z - oz*x);
@@ -1105,7 +1108,8 @@ __device__ void xyz2rtp(real x, real y, real z, real *r, real *theta, real *phi)
 }
 
 __device__ real X_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride)
+  real *pnm_re, real *pnm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   for(int j = 0; j < n; j++) coeff += j+1;
@@ -1113,11 +1117,11 @@ __device__ real X_pn(int n, real theta, real phi,
   coeff = coeff + pp*stride;
 
   int m = 0;
-  real sum = Nnm(n,m)*Pnm(n,m,theta)*pnm_re[coeff];
+  real sum = Nnm(n,m)*PNM(n,m,info)*pnm_re[coeff];
 
   for(m = 1; m <= n; m++) {
     coeff++;
-    sum += 2.*Nnm(n,m)*Pnm(n,m,theta)
+    sum += 2.*Nnm(n,m)*PNM(n,m,info)
       *(pnm_re[coeff]*cos(m*phi)
       - pnm_im[coeff]*sin(m*phi));
   }
@@ -1126,7 +1130,8 @@ __device__ real X_pn(int n, real theta, real phi,
 }
 
 __device__ real X_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride)
+  real *phinm_re, real *phinm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   for(int j = 0; j < n; j++) coeff += j+1;
@@ -1134,11 +1139,11 @@ __device__ real X_phin(int n, real theta, real phi,
   coeff = coeff + pp*stride;
 
   int m = 0;
-  real sum = Nnm(n,m)*Pnm(n,m,theta)*phinm_re[coeff];
+  real sum = Nnm(n,m)*PNM(n,m,info)*phinm_re[coeff];
 
   for(m = 1; m <= n; m++) {
     coeff++;
-    sum += 2.*Nnm(n,m)*Pnm(n,m,theta)
+    sum += 2.*Nnm(n,m)*PNM(n,m,info)
       *(phinm_re[coeff]*cos(m*phi)
       - phinm_im[coeff]*sin(m*phi));
   }
@@ -1147,7 +1152,8 @@ __device__ real X_phin(int n, real theta, real phi,
 }
 
 __device__ real Y_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride)
+  real *pnm_re, real *pnm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real ct = cos(theta);
@@ -1161,13 +1167,13 @@ __device__ real Y_pn(int n, real theta, real phi,
 
   int m = 0;
   real sum = Nnm(n,m)
-    *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+    *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
     *pnm_re[coeff];
 
   for(m = 1; m <= n; m++) {
     coeff++;
     sum += 2.*Nnm(n,m)
-      *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+      *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
       *(pnm_re[coeff]*cos(m*phi)
       - pnm_im[coeff]*sin(m*phi));
   }
@@ -1176,7 +1182,8 @@ __device__ real Y_pn(int n, real theta, real phi,
 }
 
 __device__ real Y_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride)
+  real *phinm_re, real *phinm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real ct = cos(theta);
@@ -1190,13 +1197,13 @@ __device__ real Y_phin(int n, real theta, real phi,
 
   int m = 0;
   real sum = Nnm(n,m)
-    *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+    *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
     *phinm_re[coeff];
 
   for(m = 1; m <= n; m++) {
     coeff++;
     sum += 2.*Nnm(n,m)
-      *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+      *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
       *(phinm_re[coeff]*cos(m*phi)
       - phinm_im[coeff]*sin(m*phi));
   }
@@ -1205,7 +1212,8 @@ __device__ real Y_phin(int n, real theta, real phi,
 }
 
 __device__ real Y_chin(int n, real theta, real phi,
-  real *chinm_re, real *chinm_im, int pp, int stride)
+  real *chinm_re, real *chinm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real ct = cos(theta);
@@ -1219,13 +1227,13 @@ __device__ real Y_chin(int n, real theta, real phi,
 
   int m = 0;
   real sum = Nnm(n,m)
-    *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+    *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
     *chinm_re[coeff];
 
   for(m = 1; m <= n; m++) {
     coeff++;
     sum += 2.*Nnm(n,m)
-      *(-(n+1)*ct/st*Pnm(n,m,theta)+(n-m+1)/st*Pnm(n+1,m,theta))
+      *(-(n+1)*ct/st*PNM(n,m,info)+(n-m+1)/st*PNM(n+1,m,info))
       *(chinm_re[coeff]*cos(m*phi)
       - chinm_im[coeff]*sin(m*phi));
   }
@@ -1234,7 +1242,8 @@ __device__ real Y_chin(int n, real theta, real phi,
 }
 
 __device__ real Z_pn(int n, real theta, real phi,
-  real *pnm_re, real *pnm_im, int pp, int stride)
+  real *pnm_re, real *pnm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real st = sin(theta);
@@ -1250,7 +1259,7 @@ __device__ real Z_pn(int n, real theta, real phi,
 
   for(m = 1; m <= n; m++) {
     coeff++;
-    sum += -2.*m/st*Nnm(n,m)*Pnm(n,m,theta)
+    sum += -2.*m/st*Nnm(n,m)*PNM(n,m,info)
       *(pnm_re[coeff]*sin(m*phi)
       + pnm_im[coeff]*cos(m*phi));
   }
@@ -1259,7 +1268,8 @@ __device__ real Z_pn(int n, real theta, real phi,
 }
 
 __device__ real Z_phin(int n, real theta, real phi,
-  real *phinm_re, real *phinm_im, int pp, int stride)
+  real *phinm_re, real *phinm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real st = sin(theta);
@@ -1275,7 +1285,7 @@ __device__ real Z_phin(int n, real theta, real phi,
 
   for(m = 1; m <= n; m++) {
     coeff++;
-    sum += -2.*m/st*Nnm(n,m)*Pnm(n,m,theta)
+    sum += -2.*m/st*Nnm(n,m)*PNM(n,m,info)
       *(phinm_re[coeff]*sin(m*phi)
       + phinm_im[coeff]*cos(m*phi));
   }
@@ -1284,7 +1294,8 @@ __device__ real Z_phin(int n, real theta, real phi,
 }
 
 __device__ real Z_chin(int n, real theta, real phi,
-  real *chinm_re, real *chinm_im, int pp, int stride)
+  real *chinm_re, real *chinm_im, int pp, int stride,
+  geoinfo_struct info)
 {
   int coeff = 0;
   real st = sin(theta);
@@ -1300,7 +1311,7 @@ __device__ real Z_chin(int n, real theta, real phi,
 
   for(m = 1; m <= n; m++) {
     coeff++;
-    sum += -2.*m/st*Nnm(n,m)*Pnm(n,m,theta)
+    sum += -2.*m/st*Nnm(n,m)*PNM(n,m,info)
       *(chinm_re[coeff]*sin(m*phi)
       + chinm_im[coeff]*cos(m*phi));
   }
@@ -1311,14 +1322,15 @@ __device__ real Z_chin(int n, real theta, real phi,
 __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
   real nu, real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   real *chinm_re, real *chinm_im,
-  int p_ind, int stride, real *Ux, real *Uy, real *Uz)
+  int p_ind, int stride, real *Ux, real *Uy, real *Uz,
+  geoinfo_struct info)
 {
   real ar = a / r;
   real ra = r / a;
 
   real ur = 0.;
-  real ut = 0.5*ra*Y_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride);
-  real up = 0.5*ra*Z_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride);
+  real ut = 0.5*ra*Y_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride, info);
+  real up = 0.5*ra*Z_pn(0, theta, phi, pnm_re, pnm_im, p_ind, stride, info);
 
 
   for(int n = 1; n <= order; n++) {
@@ -1334,30 +1346,30 @@ __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
 
     ur += (0.5*n*od2np3*powranp1
       + 0.25*n*((2.*n+1.)*od2np3*ar*ar-1.)*powarn)
-      * X_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
+      * X_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride, info);
     ur += (n*powranm1
       + 0.5*n*(2.*n-1.-(2.*n+1.)*ra*ra)*pow(ar,n+2.))
-      * X_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
+      * X_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride, info);
 
     ut += (0.5*(n+3.)*odnp1*od2np3*powranp1
       + 0.25*odnp1*(n-2.-n*(2.*n+1.)*od2np3*ar*ar)*powarn)
-      * Y_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
+      * Y_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride, info);
     ut += (powranm1
       + 0.5*odnp1*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*powarnp2)
-      * Y_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
+      * Y_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride, info);
     ut += (powranm1
       - powarnp1)
-      * Z_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride);
+      * Z_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride, info);
       
     up += (0.5*(n+3.)*odnp1*od2np3*powranp1
       + 0.25*odnp1*(n-2.-n*(2.*n+1.)*od2np3*ar*ar)*powarn)
-      * Z_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride);
+      * Z_pn(n, theta, phi, pnm_re, pnm_im, p_ind, stride, info);
     up += (powranm1
       + 0.5*odnp1*((n-2.)*(2.*n+1.)*ra*ra-n*(2.*n-1.))*powarnp2)
-      * Z_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride);
+      * Z_phin(n, theta, phi, phinm_re, phinm_im, p_ind, stride, info);
     up += (-powranm1
       + powarnp1)
-      * Y_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride);
+      * Y_chin(n, theta, phi, chinm_re, chinm_im, p_ind, stride, info);
   }
   ur *= nu / a;
   ut *= nu / a;
@@ -1367,7 +1379,7 @@ __device__ void lamb_vel(int order, real a, real r, real theta, real phi,
   *Uy = ur*sin(theta)*sin(phi)+ut*cos(theta)*sin(phi)+up*cos(phi);
   *Uz = ur*cos(theta)-ut*sin(theta);
 }
-
+/*
 __device__ void lamb_gradP(int order, real a, real r, real theta, real phi,
   real mu, real nu, real *pnm_re, real *pnm_im, real *phinm_re, real *phinm_im,
   int p_ind, int stride, real *gPx, real *gPy, real *gPz)
@@ -1405,7 +1417,7 @@ __device__ void lamb_gradP(int order, real a, real r, real theta, real phi,
   *gPy = pr*sin(theta)*sin(phi)+pt*cos(theta)*sin(phi)/r+pp*cos(phi)/r/st;
   *gPz = pr*cos(theta)-pt*sin(theta)/r;
 }
-
+*/
 __global__ void predict_coeffs(real dt0, real dt,
   real *pnm_re00, real *pnm_im00, real *phinm_re00, real *phinm_im00,
   real *chinm_re00, real *chinm_im00,
@@ -1435,4 +1447,288 @@ __global__ void predict_coeffs(real dt0, real dt,
   phinm_im[ti] = phinm_im[ti]*(1. + a) - phinm_im00[ti]*a;
   chinm_re[ti] = chinm_re[ti]*(1. + a) - chinm_re00[ti]*a;
   chinm_im[ti] = chinm_im[ti]*(1. + a) - chinm_im00[ti]*a;
+}
+
+__global__ void part_BC_geoinfo_u(geoinfo_struct *infou, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order)
+{
+  int tj = blockDim.x*blockIdx.x + threadIdx.x + dom->Gfx._jsb;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y + dom->Gfx._ksb;
+  int C, CW, CE;
+  real x, y, z;         // velocity node location Cartesian
+  real X, Y, Z;         // particle position
+  real r, theta, phi;   // velocity node location spherical
+  int P, PW, PE;    // particle number
+  real a;               // particle radius
+  int order;            // particle order
+
+  if(tj < dom->Gfx._jeb && tk < dom->Gfx._keb) {
+    for(int i = dom->Gfx._is; i < dom->Gfx._ie; i++) {
+      C = i + tj*dom->Gfx._s1b + tk*dom->Gfx._s2b;
+      CW = (i-1) + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      CE = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      // get particle number
+      PW = phase[CW];
+      PE = phase[CE];
+      if(PW > -1) {
+        P = PW;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else if(PE > -1) {
+        P = PE;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else {
+        P = 0;
+        a = (dom->dx + dom->dy + dom->dz) / 3.;
+        X = (i-DOM_BUF) * dom->dx + dom->xs + a;
+        Y = (tj-0.5) * dom->dy + dom->ys + a;
+        Z = (tk-0.5) * dom->dz + dom->zs + a;
+        order = 0;
+      }
+      x = (i-DOM_BUF) * dom->dx + dom->xs - X;
+      if(x <= 2.*a-dom->xl) x += dom->xl;
+      if(x >= dom->xl-2.*a) x -= dom->xl;
+      y = (tj-0.5) * dom->dy + dom->ys - Y;
+      if(y <= 2.*a-dom->yl) y += dom->yl;
+      if(y >= dom->yl-2.*a) y -= dom->yl;
+      z = (tk-0.5) * dom->dz + dom->zs - Z;
+      if(z <= 2.*a-dom->zl) z += dom->zl;
+      if(z >= dom->zl-2.*a) z -= dom->zl;
+      xyz2rtp(x, y, z, &r, &theta, &phi);
+      
+      // Nnm * Pnm
+      for(int n = 0; n <= global_order + 1; n++) {
+          for(int m = 0; m <= n; m++) {
+              infou[C].Pnm[n*(n+1)/2+m] = Pnm(n,m,theta);
+          }
+      }
+      // sin(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infou[C].phisin[i] = sin(i*phi);
+      }
+      // cos(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infou[C].phicos[i] = cos(i*phi);
+      }
+    }
+  }
+}
+
+__global__ void part_BC_geoinfo_v(geoinfo_struct *infov, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order)
+{
+  int tk = blockDim.x*blockIdx.x + threadIdx.x + dom->Gfy._ksb;
+  int ti = blockDim.y*blockIdx.y + threadIdx.y + dom->Gfy._isb;
+  int C, CS, CN;
+  real x, y, z;         // velocity node location Cartesian
+  real X, Y, Z;         // particle position
+  real r, theta, phi;   // velocity node location spherical
+  int P, PS, PN;    // particle number
+  real a;               // particle radius
+  int order;            // particle order
+
+  if(tk < dom->Gfy._keb && ti < dom->Gfy._ieb) {
+    for(int j = dom->Gfy._js; j < dom->Gfy._je; j++) {
+      C = ti + j*dom->Gfy._s1b + tk*dom->Gfy._s2b;
+      CS = ti + (j-1)*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      CN = ti + j*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      // get particle number
+      PS = phase[CS];
+      PN = phase[CN];
+      if(PS > -1) {
+        P = PS;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else if(PN > -1) {
+        P = PN;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else {
+        P = 0;
+        a = (dom->dx + dom->dy + dom->dz) / 3.;
+        X = (ti-0.5) * dom->dx + dom->xs + a;
+        Y = (j-DOM_BUF) * dom->dy + dom->ys + a;
+        Z = (tk-0.5) * dom->dz + dom->zs + a;
+        order = 0;
+      }
+      x = (ti-0.5) * dom->dx + dom->xs - X;
+      if(x <= 2.*a-dom->xl) x += dom->xl;
+      if(x >= dom->xl-2.*a) x -= dom->xl;
+      y = (j-DOM_BUF) * dom->dy + dom->ys - Y;
+      if(y <= 2.*a-dom->yl) y += dom->yl;
+      if(y >= dom->yl-2.*a) y -= dom->yl;
+      z = (tk-0.5) * dom->dz + dom->zs - Z;
+      if(z <= 2.*a-dom->zl) z += dom->zl;
+      if(z >= dom->zl-2.*a) z -= dom->zl;
+      xyz2rtp(x, y, z, &r, &theta, &phi);
+      
+      // Nnm * Pnm
+      for(int n = 0; n <= global_order + 1; n++) {
+          for(int m = 0; m <= n; m++) {
+              infov[C].Pnm[n*(n+1)/2+m] = Pnm(n,m,theta);
+          }
+      }
+      // sin(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infov[C].phisin[i] = sin(i*phi);
+      }
+      // cos(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infov[C].phicos[i] = cos(i*phi);
+      }
+    }
+  }
+}
+
+__global__ void part_BC_geoinfo_w(geoinfo_struct *infow, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order)
+{
+  int ti = blockDim.x*blockIdx.x + threadIdx.x + dom->Gfz._isb;
+  int tj = blockDim.y*blockIdx.y + threadIdx.y + dom->Gfz._jsb;
+  int C, CB, CT;
+  real x, y, z;         // velocity node location Cartesian
+  real X, Y, Z;         // particle position
+  real r, theta, phi;   // velocity node location spherical
+  int P, PB, PT;    // particle number
+  real a;               // particle radius
+  int order;            // particle order
+
+  if(ti < dom->Gfz._ieb && tj < dom->Gfz._jeb) {
+    for(int k = dom->Gfz._ks; k < dom->Gfz._ke; k++) {
+      C = ti + tj*dom->Gfz._s1b + k*dom->Gfz._s2b;
+      CB = ti + tj*dom->Gcc._s1b + (k-1)*dom->Gcc._s2b;
+      CT = ti + tj*dom->Gcc._s1b + k*dom->Gcc._s2b;
+      // get particle number
+      PB = phase[CB];
+      PT = phase[CT];
+      if(PB > -1) {
+        P = PB;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else if(PT > -1) {
+        P = PT;
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else {
+        P = 0;
+        a = (dom->dx + dom->dy + dom->dz) / 3.;
+        X = (ti-0.5) * dom->dx + dom->xs + a;
+        Y = (tj-0.5) * dom->dy + dom->ys + a;
+        Z = (k-DOM_BUF) * dom->dz + dom->zs + a;
+        order = 0;
+      }
+      x = (ti-0.5) * dom->dx + dom->xs - X;
+      if(x <= 2.*a-dom->xl) x += dom->xl;
+      if(x >= dom->xl-2.*a) x -= dom->xl;
+      y = (tj-0.5) * dom->dy + dom->ys - Y;
+      if(y <= 2.*a-dom->yl) y += dom->yl;
+      if(y >= dom->yl-2.*a) y -= dom->yl;
+      z = (k-DOM_BUF) * dom->dz + dom->zs - Z;
+      if(z <= 2.*a-dom->zl) z += dom->zl;
+      if(z >= dom->zl-2.*a) z -= dom->zl;
+      xyz2rtp(x, y, z, &r, &theta, &phi);
+      
+      // Nnm * Pnm
+      for(int n = 0; n <= global_order + 1; n++) {
+          for(int m = 0; m <= n; m++) {
+              infow[C].Pnm[n*(n+1)/2+m] = Pnm(n,m,theta);
+          }
+      }
+      // sin(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infow[C].phisin[i] = sin(i*phi);
+      }
+      // cos(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infow[C].phicos[i] = cos(i*phi);
+      }
+    }
+  }
+}
+
+__global__ void part_BC_geoinfo_p(geoinfo_struct *infop, int *phase,
+  part_struct *parts, dom_struct *dom, int global_order)
+{
+  int tj = blockDim.x*blockIdx.x + threadIdx.x + dom->Gcc._js;
+  int tk = blockDim.y*blockIdx.y + threadIdx.y + dom->Gcc._ks;
+  int C, CC;
+  real x, y, z;         // pressure node location Cartesian
+  real X, Y, Z;         // particle position
+  real r, theta, phi;   // velocity node location spherical
+  int P;            // particle number
+  real a;               // particle radius
+  int order;            // particle order
+
+  if(tj < dom->Gcc._je && tk < dom->Gcc._ke) {
+    for(int i = dom->Gcc._is; i < dom->Gcc._ie; i++) {
+      CC = i + tj*dom->Gcc._s1b + tk*dom->Gcc._s2b;
+      C = (i-DOM_BUF) + (tj-DOM_BUF)*dom->Gcc._s1 + (tk-DOM_BUF)*dom->Gcc._s2;
+      // get particle number
+      P = phase[CC];
+      if(P > -1) {
+        a = parts[P].r;
+        X = parts[P].x;
+        Y = parts[P].y;
+        Z = parts[P].z;
+        order = parts[P].order;
+      } else {
+        P = 0;
+        a = (dom->dx + dom->dy + dom->dz) / 3.;
+        X = (i-0.5) * dom->dx + dom->xs + a;
+        Y = (tj-0.5) * dom->dy + dom->ys + a;
+        Z = (tk-0.5) * dom->dz + dom->zs + a;
+        order = 0;
+      }
+      x = (i-0.5) * dom->dx + dom->xs - X;
+      if(x <= 2.*a-dom->xl) x += dom->xl;
+      if(x >= dom->xl-2.*a) x -= dom->xl;
+      y = (tj-0.5) * dom->dy + dom->ys - Y;
+      if(y <= 2.*a-dom->yl) y += dom->yl;
+      if(y >= dom->yl-2.*a) y -= dom->yl;
+      z = (tk-0.5) * dom->dz + dom->zs - Z;
+      if(z <= 2.*a-dom->zl) z += dom->zl;
+      if(z >= dom->zl-2.*a) z -= dom->zl;
+      xyz2rtp(x, y, z, &r, &theta, &phi);
+      
+      // Pnm
+      for(int n = 0; n <= global_order + 1; n++) {
+          for(int m = 0; m <= n; m++) {
+              infop[CC].Pnm[n*(n+1)/2+m] = Pnm(n,m,theta);
+          }
+      }
+      // sin(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infop[CC].phisin[i] = sin(i*phi);
+      }
+      // cos(m*phi)
+      for(int i = 0; i <= global_order; i++) {
+          infop[CC].phicos[i] = cos(i*phi);
+      }
+    }
+  }
+}
+
+__device__ real PNM(int n, int m, geoinfo_struct info)
+{
+    int i = n*(n+1)/2+m;
+    return info.Pnm[i];
 }
